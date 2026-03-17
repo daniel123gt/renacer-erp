@@ -74,12 +74,15 @@ export default function AuthPage() {
     }
   };
   return (
-    <div className="grid grid-cols-12 h-dvh">
-      <div className="col-span-8 flex flex-col gap-12 justify-center items-center bg-soft-blue">
-        <h1 className="text-6xl text-center font-light text-primary-blue text-wrap max-w-[400px]">
-          {getAppName()}
+    <div className="flex flex-col lg:grid lg:grid-cols-12 min-h-dvh">
+      <div className="flex-1 flex flex-col gap-8 lg:gap-12 justify-center items-center bg-soft-blue lg:col-span-8 px-4 py-12 sm:px-6 relative z-10">
+        <div className="flex flex-col items-center gap-4 lg:hidden">
+          <img src="/logo-light-large.png" alt={getAppName()} className="w-20 h-20 rounded-2xl shadow-lg bg-primary-blue p-2" />
+        </div>
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl text-center font-bold text-primary-blue uppercase max-w-[400px]">
+          {getAppName()} ERP
         </h1>
-        <Card className="w-[400px] border-0">
+        <Card className="w-full max-w-[400px] border-0">
           <CardHeader>
             <CardTitle className="text-primary-blue font-bold text-2xl">
               Iniciar Sesión
@@ -89,7 +92,7 @@ export default function AuthPage() {
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit(onSubmit)}
-                className="flex flex-col gap-8"
+                className="flex flex-col gap-6 sm:gap-8"
               >
                 <FormField
                   control={form.control}
@@ -139,12 +142,12 @@ export default function AuthPage() {
           </CardContent>
         </Card>
       </div>
-      <div className="col-span-4 bg-primary-blue flex justify-center items-center p-12">
+      <div className="hidden lg:flex lg:col-span-4 bg-primary-blue justify-center items-center p-12">
         <figure className="flex justify-center items-center">
           <img src="/logo-light-large.png" alt={getAppName()} className="w-3/4 max-w-[280px] rounded-3xl" />
         </figure>
       </div>
-      <div className="absolute bottom-0 left-0">
+      <div className="absolute bottom-0 left-0 hidden sm:block">
         <img src="illus/Rectangle1.svg" className="w-[80%]" />
         <img src="illus/Rectangle2.svg" className="absolute bottom-0 w-[80%]" />
       </div>

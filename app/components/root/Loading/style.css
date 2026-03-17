@@ -1,44 +1,41 @@
 .loader {
   position: relative;
-  width: 40px;
-  height: 60px;
-  animation: heartBeat 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+  width: 48px;
+  height: 48px;
+  animation: crossPulse 1.4s infinite ease-in-out;
 }
 
 .loader:before,
 .loader:after {
   content: "";
-  background: #1F3666;
-  width: 40px;
-  height: 60px;
-  border-radius: 50px 50px 0 0;
   position: absolute;
-  left: 0;
-  bottom: 0;
-  transform: rotate(45deg);
-  transform-origin: 50% 68%;
-  box-shadow: 5px 4px 5px #0004 inset;
+  background: #2a4945;
+  border-radius: 6px;
 }
+
+.loader:before {
+  width: 14px;
+  height: 48px;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .loader:after {
-  transform: rotate(-45deg);
+  width: 48px;
+  height: 14px;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
 }
-@keyframes heartBeat {
-  0% {
-    transform: scale(0.95);
-  }
-  5% {
-    transform: scale(1.1);
-  }
-  39% {
+
+@keyframes crossPulse {
+  0%, 100% {
     transform: scale(0.85);
+    opacity: 0.6;
   }
-  45% {
-    transform: scale(1);
-  }
-  60% {
-    transform: scale(0.95);
-  }
-  100% {
-    transform: scale(0.9);
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
   }
 }
