@@ -1,0 +1,176 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import { useAuthStore } from "~/store/authStore";
+import {
+  Package,
+  BarChart3,
+  Settings,
+  ArrowRight,
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Loader2,
+  Store,
+} from "lucide-react";
+import { getAppName } from "~/lib/erpBranding";
+import { finanzasService, type BalanceMensual } from "~/services/finanzasService";
+
+function formatMoney(n: number): string {
+  return n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const MESES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+const quickAccess = [
+  {
+    title: "Finanzas",
+    description: "Registra ingresos y egresos de la iglesia",
+    icon: Wallet,
+    url: "/finanzas",
+    iconBg: "bg-primary-blue/10",
+    iconColor: "text-primary-blue",
+  },
+  {
+    title: "Renashop",
+    description: "Gestiona la tienda, ventas e inventario",
+    icon: Store,
+    url: "/renashop",
+    iconBg: "bg-amber-100",
+    iconColor: "text-amber-600",
+  },
+  {
+    title: "Reportes",
+    description: "Consulta reportes y estadísticas",
+    icon: BarChart3,
+    url: "/reportes",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-700",
+  },
+  {
+    title: "Configuración",
+    description: "Ajustes generales del sistema",
+    icon: Settings,
+    url: "/configuracion",
+    iconBg: "bg-gray-100",
+    iconColor: "text-gray-700",
+  },
+];
+
+export default function HomeDashboard() {
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Usuario";
+
+  const now = new Date();
+  const [balance, setBalance] = useState<BalanceMensual | null>(null);
+  const [loadingBalance, setLoadingBalance] = useState(true);
+
+  useEffect(() => {
+    setLoadingBalance(true);
+    finanzasService
+      .getBalanceMensual(now.getFullYear(), now.getMonth() + 1)
+      .then(setBalance)
+      .catch(() => setBalance(null))
+      .finally(() => setLoadingBalance(false));
+  }, []);
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold text-primary-blue">{getAppName()}</h1>
+        <p className="text-gray-600 mt-2">Bienvenido(a), {userName}</p>
+      </div>
+
+      {/* Resumen financiero del mes */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">
+          Balance {MESES[now.getMonth()]} {now.getFullYear()}
+        </h2>
+        {loadingBalance ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary-blue" />
+          </div>
+        ) : balance ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-green-50 border-green-100">
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-green-700">Entradas</p>
+                    <p className="text-xl font-bold text-green-800 mt-1">
+                      S/ {formatMoney(balance.totalEntradas)}
+                    </p>
+                  </div>
+                  <TrendingUp className="w-7 h-7 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-red-50 border-red-100">
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-red-700">Salidas</p>
+                    <p className="text-xl font-bold text-red-800 mt-1">
+                      S/ {formatMoney(balance.totalSalidas)}
+                    </p>
+                  </div>
+                  <TrendingDown className="w-7 h-7 text-red-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className={balance.saldo >= 0 ? "bg-primary-blue/5 border-primary-blue/20" : "bg-orange-50 border-orange-200"}>
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-600">Saldo Actual</p>
+                    <p className={`text-xl font-bold mt-1 ${balance.saldo >= 0 ? "text-primary-blue" : "text-orange-700"}`}>
+                      S/ {formatMoney(balance.saldo)}
+                    </p>
+                  </div>
+                  <DollarSign className={`w-7 h-7 ${balance.saldo >= 0 ? "text-primary-blue" : "text-orange-500"}`} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="py-6 text-center text-gray-500 text-sm">
+              No se pudo cargar el resumen financiero
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Accesos rápidos */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">Accesos rápidos</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {quickAccess.map((item) => (
+            <Card
+              key={item.url}
+              className="hover:shadow-lg transition-shadow cursor-pointer group"
+              onClick={() => navigate(item.url)}
+            >
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between">
+                  <div className={`p-2.5 rounded-xl ${item.iconBg}`}>
+                    <item.icon className={`w-5 h-5 ${item.iconColor}`} />
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-primary-blue transition-colors" />
+                </div>
+                <h3 className="text-base font-semibold text-gray-900 mt-3">{item.title}</h3>
+                <p className="text-xs text-gray-500 mt-1">{item.description}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

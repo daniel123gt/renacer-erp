@@ -1,0 +1,12 @@
+.DS_Store
+/node_modules/
+.env.local
+.env.*.local
+
+# React Router
+/.react-router/
+/build/
+
+# No necesarios para la app
+/scripts/
+/docs/

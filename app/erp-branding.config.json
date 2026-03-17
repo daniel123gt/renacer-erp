@@ -1,0 +1,9 @@
+{
+  "appName": "Renacer",
+  "shortName": "Renacer",
+  "primaryColor": "#2a4945",
+  "accentColor": "#abd9cd",
+  "secondaryColor": "#d8dfd6",
+  "logoPath": "/logo.png",
+  "faviconPath": "/logo.png"
+}
