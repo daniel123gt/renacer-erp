@@ -11,6 +11,7 @@ export default [
     route('renashop', 'routes/renashop.tsx'),
     route('renashop/ventas', 'routes/renashop-ventas.tsx'),
     route('renashop/inventario', 'routes/renashop-inventario.tsx'),
+    route('renashop/reportes', 'routes/renashop-reportes.tsx'),
     route('reportes', 'routes/reportes.tsx'),
     route('configuracion', 'routes/configuracion.tsx'),
     route('mi-perfil', 'routes/mi-perfil.tsx'),

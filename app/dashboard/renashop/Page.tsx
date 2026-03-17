@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Loader2,
   ArrowRight,
+  BarChart3,
 } from "lucide-react";
 import {
   BarChart,
@@ -233,7 +234,7 @@ export default function RenashopPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link to="/renashop/ventas">
           <Card className="hover:shadow-md transition-shadow cursor-pointer group">
             <CardContent className="pt-6">
@@ -244,7 +245,7 @@ export default function RenashopPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900">Ventas</p>
-                    <p className="text-sm text-gray-500">Registrar y ver historial de ventas</p>
+                    <p className="text-sm text-gray-500">Registrar y ver historial</p>
                   </div>
                 </div>
                 <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-amber-500 transition-colors" />
@@ -266,6 +267,24 @@ export default function RenashopPage() {
                   </div>
                 </div>
                 <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link to="/renashop/reportes">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer group">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-green-100 rounded-lg">
+                    <BarChart3 className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">Reportes</p>
+                    <p className="text-sm text-gray-500">Ventas, costos y ganancias</p>
+                  </div>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-green-500 transition-colors" />
               </div>
             </CardContent>
           </Card>

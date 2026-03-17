@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { Combobox, type ComboboxOption } from "~/components/ui/combobox";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import {
@@ -85,7 +86,7 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
     const prod = productos.find((p) => p.id === value);
     if (prod) {
       setProductoNombre(prod.name);
-      setPrecioUnitario(String(prod.price));
+      setPrecioUnitario(String(prod.salePrice));
     }
   };
 
@@ -165,19 +166,17 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
 
           <div>
             <Label>Producto</Label>
-            <Select value={productoId} onValueChange={handleProductoChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar producto" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="manual">Escribir manualmente</SelectItem>
-                {productos.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name} — S/ {p.price.toFixed(2)} ({p.currentStock} disp.)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              value={productoId}
+              onValueChange={handleProductoChange}
+              placeholder="Buscar producto..."
+              emptySearchText="No se encontró el producto"
+              emptyOption={{ value: "manual", label: "✏️ Escribir manualmente" }}
+              options={productos.map((p) => ({
+                value: p.id,
+                label: `${p.name} — S/ ${p.salePrice.toFixed(2)} (${p.currentStock} disp.)`,
+              }))}
+            />
           </div>
 
           {productoId === "manual" && (

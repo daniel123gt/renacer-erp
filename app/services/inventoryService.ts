@@ -12,6 +12,7 @@ export interface InventoryItem {
   maxStock: number;
   unit: string;
   price: number;
+  salePrice: number;
   supplier: string;
   lastRestocked: string;
   expiryDate?: string;
@@ -22,6 +23,7 @@ interface MaterialsRow {
   id: string;
   name: string;
   cost_soles: number;
+  precio_venta?: number | null;
   is_active?: boolean;
   stock?: number | null;
   proveedor?: string | null;
@@ -64,6 +66,7 @@ function rowToItem(r: MaterialsRow): InventoryItem {
     maxStock: Number(r.max_stock ?? 0),
     unit: r.unit ?? "unidades",
     price: Number(r.cost_soles ?? 0),
+    salePrice: Number(r.precio_venta ?? 0),
     supplier: r.proveedor ?? "",
     lastRestocked: r.last_restocked
       ? String(r.last_restocked).slice(0, 10)
@@ -74,7 +77,7 @@ function rowToItem(r: MaterialsRow): InventoryItem {
 }
 
 const MATERIALS_SELECT =
-  "id, name, cost_soles, is_active, stock, proveedor, estado, categoria, description, min_stock, max_stock, unit, last_restocked, expiry_date";
+  "id, name, cost_soles, precio_venta, is_active, stock, proveedor, estado, categoria, description, min_stock, max_stock, unit, last_restocked, expiry_date";
 
 export interface ListInventoryResult {
   data: InventoryItem[];
@@ -132,6 +135,7 @@ export const inventoryService = {
       .insert({
         name: item.name.trim(),
         cost_soles: item.price,
+        precio_venta: item.salePrice,
         is_active: true,
         stock: item.currentStock,
         proveedor: item.supplier?.trim() || null,
@@ -164,6 +168,7 @@ export const inventoryService = {
       .update({
         name: item.name.trim(),
         cost_soles: item.price,
+        precio_venta: item.salePrice,
         stock: item.currentStock,
         proveedor: item.supplier?.trim() || null,
         estado: status,

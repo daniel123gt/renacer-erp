@@ -250,19 +250,26 @@ export function ViewInventoryModal({ item }: ViewInventoryModalProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <DollarSign className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600 mb-1">Precio Unitario</p>
-                  <p className="text-2xl font-bold text-green-600">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <DollarSign className="w-8 h-8 text-gray-500 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600 mb-1">P. Compra</p>
+                  <p className="text-2xl font-bold text-gray-700">
                     S/ {item.price.toFixed(2)}
                   </p>
                 </div>
-                <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  <DollarSign className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600 mb-1">Valor Total</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    S/ {(item.currentStock * item.price).toFixed(2)}
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <DollarSign className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600 mb-1">P. Venta</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    S/ {item.salePrice.toFixed(2)}
+                  </p>
+                </div>
+                <div className="text-center p-4 bg-amber-50 rounded-lg">
+                  <DollarSign className="w-8 h-8 text-amber-600 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600 mb-1">Ganancia / ud.</p>
+                  <p className="text-2xl font-bold text-amber-600">
+                    S/ {(item.salePrice - item.price).toFixed(2)}
                   </p>
                 </div>
               </div>

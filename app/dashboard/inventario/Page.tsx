@@ -158,8 +158,12 @@ export default function InventarioPage() {
   const outOfStockItems = inventory.filter(
     (i) => i.status === "out_of_stock"
   ).length;
-  const totalValue = inventory.reduce(
+  const totalCost = inventory.reduce(
     (acc, item) => acc + item.currentStock * item.price,
+    0
+  );
+  const totalSaleValue = inventory.reduce(
+    (acc, item) => acc + item.currentStock * item.salePrice,
     0
   );
 
@@ -225,8 +229,9 @@ export default function InventarioPage() {
                 <DollarSign className="w-6 h-6 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-600">Valor Total</p>
-                <p className="text-2xl font-bold text-gray-900">S/ {totalValue.toFixed(2)}</p>
+                <p className="text-sm font-medium text-gray-600">Costo Inventario</p>
+                <p className="text-2xl font-bold text-gray-900">S/ {totalCost.toFixed(2)}</p>
+                <p className="text-xs text-green-600 mt-0.5">Venta: S/ {totalSaleValue.toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
@@ -295,7 +300,8 @@ export default function InventarioPage() {
                 <TableHead>Producto</TableHead>
                 <TableHead>Categoría</TableHead>
                 <TableHead>Stock</TableHead>
-                <TableHead>Precio Unitario</TableHead>
+                <TableHead>P. Compra</TableHead>
+                <TableHead>P. Venta</TableHead>
                 <TableHead>Proveedor</TableHead>
                 <TableHead>Último Restock</TableHead>
                 <TableHead>Estado</TableHead>
@@ -329,10 +335,10 @@ export default function InventarioPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <DollarSign className="w-4 h-4 text-green-600" />
-                      <span className="font-semibold">S/ {item.price.toFixed(2)}</span>
-                    </div>
+                    <span className="text-sm text-gray-600">S/ {item.price.toFixed(2)}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-semibold text-green-700">S/ {item.salePrice.toFixed(2)}</span>
                   </TableCell>
                   <TableCell>
                     <p className="text-sm text-gray-600">{item.supplier}</p>

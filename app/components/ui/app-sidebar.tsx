@@ -67,6 +67,7 @@ const items: NavItem[] = [
     children: [
       { title: "Ventas", url: "/renashop/ventas" },
       { title: "Inventario", url: "/renashop/inventario" },
+      { title: "Reportes", url: "/renashop/reportes" },
     ],
   },
   {

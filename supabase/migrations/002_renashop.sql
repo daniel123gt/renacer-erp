@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS materials (
   description text,
   categoria text DEFAULT 'Otros',
   cost_soles numeric(12,2) NOT NULL DEFAULT 0,
+  precio_venta numeric(12,2) NOT NULL DEFAULT 0,
   stock integer NOT NULL DEFAULT 0,
   min_stock integer NOT NULL DEFAULT 0,
   max_stock integer NOT NULL DEFAULT 0,
@@ -77,23 +78,10 @@ CREATE INDEX idx_ventas_renashop_metodo ON ventas_renashop(metodo_pago);
 -- -----------------------------------------------
 -- 3. Productos iniciales de la tienda
 -- -----------------------------------------------
-INSERT INTO materials (name, description, categoria, cost_soles, stock, min_stock, max_stock, unit, estado) VALUES
-  -- Bebidas
-  ('Agua mineral 500ml',    'Botella de agua mineral',           'Bebidas', 1.00, 24, 6, 48, 'unidades', 'in_stock'),
-  ('Gaseosa personal',      'Gaseosa 500ml varios sabores',      'Bebidas', 2.00, 20, 5, 40, 'unidades', 'in_stock'),
-  ('Jugo de caja',          'Jugo en caja 250ml',                'Bebidas', 1.50, 15, 5, 30, 'unidades', 'in_stock'),
-  ('Café instantáneo',      'Sobre de café instantáneo',         'Bebidas', 0.50, 30, 10, 60, 'sobres',   'in_stock'),
-
-  -- Snacks
-  ('Galletas surtidas',     'Paquete individual de galletas',    'Snacks',  1.00, 20, 5, 40, 'paquetes', 'in_stock'),
-  ('Papas fritas',          'Bolsa individual de papas',         'Snacks',  1.50, 15, 5, 30, 'bolsas',   'in_stock'),
-  ('Maní salado',           'Bolsa de maní 50g',                 'Snacks',  1.00, 12, 5, 25, 'bolsas',   'in_stock'),
-
-  -- Comida
-  ('Sándwich preparado',    'Sándwich mixto fresco',             'Comida',  3.50,  8, 3, 15, 'unidades', 'in_stock'),
-  ('Empanada',              'Empanada horneada rellena',         'Comida',  2.50, 10, 3, 20, 'unidades', 'in_stock'),
-
-  -- Dulces
-  ('Chocolate barra',       'Barra de chocolate con leche',      'Dulces',  2.00, 15, 5, 30, 'unidades', 'in_stock'),
-  ('Caramelos surtidos',    'Bolsa de caramelos variados',       'Dulces',  0.50, 40, 10, 80, 'unidades', 'in_stock'),
-  ('Gomitas',               'Bolsa de gomitas 50g',              'Dulces',  1.00, 18, 5, 35, 'bolsas',   'in_stock');
+INSERT INTO materials (name, description, categoria, cost_soles, precio_venta, stock, min_stock, max_stock, unit, estado) VALUES
+  ('Agua Cielo 625ml',        'Botella de agua Cielo 625ml',                  'Bebidas', 0.80, 1.50, 24, 6, 48, 'unidades', 'in_stock'),
+  ('Agua Cielo Chupón 1lt',   'Botella de agua Cielo con chupón 1 litro',    'Bebidas', 1.50, 2.50, 20, 6, 40, 'unidades', 'in_stock'),
+  ('Free Tea Limón 500ml',    'Té Free Tea sabor limón 500ml',               'Bebidas', 1.50, 2.50, 18, 5, 36, 'unidades', 'in_stock'),
+  ('Pulp Durazno caja 315ml', 'Jugo Pulp sabor durazno en caja 315ml',      'Bebidas', 1.00, 1.50, 15, 5, 30, 'unidades', 'in_stock'),
+  ('Sporade Tropical 500ml',  'Bebida rehidratante Sporade Tropical 500ml',  'Bebidas', 1.80, 3.00, 18, 5, 36, 'unidades', 'in_stock'),
+  ('Pepsi Zero 355ml',        'Gaseosa Pepsi Zero 355ml',                    'Bebidas', 1.20, 2.00, 20, 5, 40, 'unidades', 'in_stock');

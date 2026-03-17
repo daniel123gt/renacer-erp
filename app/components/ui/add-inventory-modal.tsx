@@ -19,7 +19,6 @@ import {
   AlertTriangle,
   TrendingUp,
   AlertCircle,
-  Building2,
   Loader2,
 } from "lucide-react";
 import type { InventoryItem } from "~/services/inventoryService";
@@ -29,38 +28,22 @@ interface AddInventoryModalProps {
 }
 
 const categories = [
-  "Insumos",
-  "Protección",
-  "Medicamentos",
-  "Vendajes",
-  "Limpieza",
-  "Equipos",
-  "Instrumental",
-  "Consumibles"
+  "Bebidas",
+  "Snacks",
+  "Comida",
+  "Dulces",
+  "Otros",
 ];
 
 const units = [
   "unidades",
-  "pares",
-  "tabletas",
-  "rollos",
   "botellas",
+  "paquetes",
+  "bolsas",
   "cajas",
+  "sobres",
   "litros",
   "kg",
-  "metros",
-  "frascos"
-];
-
-const suppliers = [
-  "MedSupply S.A.",
-  "SafeGloves",
-  "PharmaCorp",
-  "BandagePro",
-  "CleanChem",
-  "MedEquip",
-  "HealthTech",
-  "BioMed Solutions"
 ];
 
 export function AddInventoryModal({ onInventoryAdded }: AddInventoryModalProps) {
@@ -75,6 +58,7 @@ export function AddInventoryModal({ onInventoryAdded }: AddInventoryModalProps) 
     maxStock: 0,
     unit: "",
     price: 0,
+    salePrice: 0,
     supplier: "",
     lastRestocked: new Date().toISOString().split('T')[0],
     expiryDate: "",
@@ -117,6 +101,7 @@ export function AddInventoryModal({ onInventoryAdded }: AddInventoryModalProps) 
         maxStock: 0,
         unit: "",
         price: 0,
+        salePrice: 0,
         supplier: "",
         lastRestocked: new Date().toISOString().split("T")[0],
         expiryDate: "",
@@ -316,45 +301,44 @@ export function AddInventoryModal({ onInventoryAdded }: AddInventoryModalProps) 
                 Información Comercial
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Precio Unitario (S/) *
+                  Precio de Compra (S/) *
                 </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => handleInputChange("price", parseFloat(e.target.value) || 0)}
-                    className="pl-10"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
+                <Input
+                  type="number"
+                  value={formData.price}
+                  onChange={(e) => handleInputChange("price", parseFloat(e.target.value) || 0)}
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Precio de Venta (S/) *
+                </label>
+                <Input
+                  type="number"
+                  value={formData.salePrice}
+                  onChange={(e) => handleInputChange("salePrice", parseFloat(e.target.value) || 0)}
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  required
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Proveedor
                 </label>
-                <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <select
-                    value={formData.supplier}
-                    onChange={(e) => handleInputChange("supplier", e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-blue"
-                    required
-                  >
-                    <option value="">Seleccionar proveedor</option>
-                    {suppliers.map((supplier) => (
-                      <option key={supplier} value={supplier}>
-                        {supplier}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <Input
+                  value={formData.supplier}
+                  onChange={(e) => handleInputChange("supplier", e.target.value)}
+                  placeholder="Nombre del proveedor"
+                />
               </div>
             </CardContent>
           </Card>
@@ -432,21 +416,15 @@ export function AddInventoryModal({ onInventoryAdded }: AddInventoryModalProps) 
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Precio y Estado:</p>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">S/ {formData.price.toFixed(2)}</span>
-                    {getStatusBadge(currentStatus)}
-                  </div>
+                  <p className="text-sm text-gray-600">Precios:</p>
+                  <p className="font-medium">Compra: S/ {formData.price.toFixed(2)} | Venta: S/ {formData.salePrice.toFixed(2)}</p>
+                  {formData.salePrice > formData.price && (
+                    <p className="text-xs text-green-600">Ganancia: S/ {(formData.salePrice - formData.price).toFixed(2)} por unidad</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Proveedor:</p>
-                  <p className="font-medium">{formData.supplier || "No seleccionado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Valor Total:</p>
-                  <p className="font-medium text-green-600">
-                    S/ {(formData.currentStock * formData.price).toFixed(2)}
-                  </p>
+                  <p className="text-sm text-gray-600">Estado:</p>
+                  {getStatusBadge(currentStatus)}
                 </div>
               </div>
             </CardContent>
