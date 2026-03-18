@@ -164,9 +164,9 @@ export default function VentasPage() {
   };
 
   const handleExportCSV = () => {
-    const headers = "Fecha,Producto,Cantidad,Precio Unitario (S/),Total (S/),Método de Pago\n";
+    const headers = "Fecha,Producto,Cantidad,Costo Unit. (S/),P. Venta Unit. (S/),Total (S/),Ganancia (S/),Método de Pago\n";
     const rows = ventas.map((v) =>
-      [v.fecha, `"${v.producto_nombre}"`, v.cantidad, v.precio_unitario.toFixed(2), v.total.toFixed(2), v.metodo_pago ?? ""].join(",")
+      [v.fecha, `"${v.producto_nombre}"`, v.cantidad, v.costo_unitario.toFixed(2), v.precio_unitario.toFixed(2), v.total.toFixed(2), v.ganancia.toFixed(2), v.metodo_pago ?? ""].join(",")
     );
     const blob = new Blob([headers + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
@@ -407,8 +407,10 @@ export default function VentasPage() {
                         <TableHead>Fecha</TableHead>
                         <TableHead>Producto</TableHead>
                         <TableHead className="text-center">Cant.</TableHead>
-                        <TableHead className="text-right">P. Unit.</TableHead>
+                        <TableHead className="text-right">Costo</TableHead>
+                        <TableHead className="text-right">P. Venta</TableHead>
                         <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Ganancia</TableHead>
                         <TableHead>Método</TableHead>
                         <TableHead className="w-[70px]"></TableHead>
                       </TableRow>
@@ -417,13 +419,17 @@ export default function VentasPage() {
                       {ventas.map((v) => (
                         <TableRow key={v.id} className="group">
                           <TableCell className="whitespace-nowrap text-sm">{v.fecha}</TableCell>
-                          <TableCell className="max-w-[200px] truncate font-medium" title={v.producto_nombre}>
+                          <TableCell className="max-w-[180px] truncate font-medium" title={v.producto_nombre}>
                             {v.producto_nombre}
                           </TableCell>
                           <TableCell className="text-center">{v.cantidad}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums text-red-600">S/ {formatMoney(v.costo_unitario)}</TableCell>
                           <TableCell className="text-right text-sm tabular-nums">S/ {formatMoney(v.precio_unitario)}</TableCell>
                           <TableCell className="text-right font-semibold tabular-nums text-amber-600">
                             S/ {formatMoney(v.total)}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold tabular-nums text-green-600">
+                            S/ {formatMoney(v.ganancia)}
                           </TableCell>
                           <TableCell>
                             {v.metodo_pago ? (

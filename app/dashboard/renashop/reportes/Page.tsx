@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { toast } from "sonner";
 import {
-  Store,
   ChevronLeft,
   ChevronRight,
   TrendingUp,
@@ -31,7 +30,6 @@ import {
   Legend,
 } from "recharts";
 import { ventasRenashopService, type VentaRenashop } from "~/services/ventasRenashopService";
-import { inventoryService, type InventoryItem } from "~/services/inventoryService";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -59,18 +57,12 @@ export default function ReportesRenashopPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [loading, setLoading] = useState(true);
   const [ventas, setVentas] = useState<VentaRenashop[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   const loadData = () => {
     setLoading(true);
-    Promise.all([
-      ventasRenashopService.getVentasMes(year, month),
-      inventoryService.list(),
-    ])
-      .then(([v, inv]) => {
-        setVentas(v);
-        setInventory(inv);
-      })
+    ventasRenashopService
+      .getVentasMes(year, month)
+      .then(setVentas)
       .catch(() => toast.error("Error al cargar datos"))
       .finally(() => setLoading(false));
   };
@@ -88,14 +80,6 @@ export default function ReportesRenashopPage() {
     else setMonth(month + 1);
   };
 
-  const costoMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    inventory.forEach((item) => {
-      map[item.id] = item.price;
-    });
-    return map;
-  }, [inventory]);
-
   const productReports = useMemo<ProductReport[]>(() => {
     const map: Record<string, { nombre: string; cantidad: number; ingresos: number; costo: number }> = {};
     ventas.forEach((v) => {
@@ -103,8 +87,7 @@ export default function ReportesRenashopPage() {
       if (!map[key]) map[key] = { nombre: key, cantidad: 0, ingresos: 0, costo: 0 };
       map[key].cantidad += v.cantidad;
       map[key].ingresos += v.total;
-      const costoUnitario = v.producto_id ? (costoMap[v.producto_id] ?? 0) : 0;
-      map[key].costo += costoUnitario * v.cantidad;
+      map[key].costo += v.costo_unitario * v.cantidad;
     });
     return Object.values(map)
       .map((p) => ({
@@ -113,7 +96,7 @@ export default function ReportesRenashopPage() {
         margen: p.ingresos > 0 ? ((p.ingresos - p.costo) / p.ingresos) * 100 : 0,
       }))
       .sort((a, b) => b.ingresos - a.ingresos);
-  }, [ventas, costoMap]);
+  }, [ventas]);
 
   const totalIngresos = productReports.reduce((s, p) => s + p.ingresos, 0);
   const totalCosto = productReports.reduce((s, p) => s + p.costo, 0);
@@ -128,14 +111,13 @@ export default function ReportesRenashopPage() {
       const dayLabel = day.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
       if (!map[dayLabel]) map[dayLabel] = { dia: dayLabel, ingresos: 0, costo: 0, ganancia: 0 };
       map[dayLabel].ingresos += v.total;
-      const costoUnit = v.producto_id ? (costoMap[v.producto_id] ?? 0) : 0;
-      map[dayLabel].costo += costoUnit * v.cantidad;
+      map[dayLabel].costo += v.costo_unitario * v.cantidad;
     });
     return Object.values(map).map((d) => ({
       ...d,
       ganancia: d.ingresos - d.costo,
     }));
-  }, [ventas, costoMap]);
+  }, [ventas]);
 
   const topGanancias = useMemo(() => {
     return productReports.slice(0, 8).map((p) => ({
@@ -162,13 +144,12 @@ export default function ReportesRenashopPage() {
       const vMonth = parseInt(v.fecha.split("-")[1], 10);
       if (vMonth >= 1 && vMonth <= 12) {
         meses[vMonth - 1].ingresos += v.total;
-        const costoUnit = v.producto_id ? (costoMap[v.producto_id] ?? 0) : 0;
-        meses[vMonth - 1].costo += costoUnit * v.cantidad;
+        meses[vMonth - 1].costo += v.costo_unitario * v.cantidad;
       }
     });
     meses.forEach((m) => { m.ganancia = m.ingresos - m.costo; });
     return meses;
-  }, [ventas, costoMap]);
+  }, [ventas]);
 
   const exportCSV = () => {
     if (productReports.length === 0) return;

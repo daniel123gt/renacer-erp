@@ -48,7 +48,10 @@ CREATE INDEX idx_transacciones_categoria ON transacciones (categoria_id);
 -- Tipos de Entrada
 INSERT INTO categorias_finanzas (nombre, tipo, orden) VALUES
   ('Ofrenda', 'entrada', 1),
-  ('Promesa', 'entrada', 2);
+  ('Promesa', 'entrada', 2),
+  ('Préstamo', 'entrada', 3),
+  ('Venta Equipo', 'entrada', 4),
+  ('Otros', 'entrada', 99);
 
 -- Tipos de Salida
 INSERT INTO categorias_finanzas (nombre, tipo, orden) VALUES
@@ -57,4 +60,7 @@ INSERT INTO categorias_finanzas (nombre, tipo, orden) VALUES
   ('Alquiler', 'salida', 3),
   ('Ofrenda Pastor Invitado', 'salida', 4),
   ('Movilidad', 'salida', 5),
-  ('Google Meet', 'salida', 6);
+  ('Google Meet', 'salida', 6),
+  ('Pago Préstamo', 'salida', 7),
+  ('Compra Equipo', 'salida', 8),
+  ('Otros', 'salida', 99);

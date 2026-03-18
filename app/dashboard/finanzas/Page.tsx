@@ -156,7 +156,7 @@ export default function FinanzasPage() {
           tx.tipo === "entrada" ? "text-green-600" : "text-red-600"
         }`}
       >
-        {tx.tipo === "entrada" ? "+" : "-"} ${formatMoney(tx.monto)}
+        {tx.tipo === "entrada" ? "+" : "-"} S/ {formatMoney(tx.monto)}
       </TableCell>
       <TableCell className="text-right">
         <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">

@@ -34,7 +34,6 @@ interface Props {
 
 const METODOS_PAGO = [
   { value: "efectivo", label: "Efectivo" },
-  { value: "yape", label: "Yape" },
   { value: "plin", label: "Plin" },
   { value: "transferencia", label: "Transferencia" },
   { value: "otro", label: "Otro" },
@@ -47,6 +46,7 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
   const [productoId, setProductoId] = useState("");
   const [productoNombre, setProductoNombre] = useState("");
   const [cantidad, setCantidad] = useState("1");
+  const [costoUnitario, setCostoUnitario] = useState("");
   const [precioUnitario, setPrecioUnitario] = useState("");
   const [metodoPago, setMetodoPago] = useState("efectivo");
   const [notas, setNotas] = useState("");
@@ -61,6 +61,7 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
         setProductoId(editData.producto_id ?? "manual");
         setProductoNombre(editData.producto_nombre);
         setCantidad(String(editData.cantidad));
+        setCostoUnitario(String(editData.costo_unitario));
         setPrecioUnitario(String(editData.precio_unitario));
         setMetodoPago(editData.metodo_pago ?? "efectivo");
         setNotas(editData.notas ?? "");
@@ -69,6 +70,7 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
         setProductoId("");
         setProductoNombre("");
         setCantidad("1");
+        setCostoUnitario("");
         setPrecioUnitario("");
         setMetodoPago("efectivo");
         setNotas("");
@@ -80,17 +82,23 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
     setProductoId(value);
     if (value === "manual") {
       setProductoNombre("");
+      setCostoUnitario("");
       setPrecioUnitario("");
       return;
     }
     const prod = productos.find((p) => p.id === value);
     if (prod) {
       setProductoNombre(prod.name);
+      setCostoUnitario(String(prod.price));
       setPrecioUnitario(String(prod.salePrice));
     }
   };
 
-  const total = (Number(cantidad) || 0) * (Number(precioUnitario) || 0);
+  const cant = Number(cantidad) || 0;
+  const costo = Number(costoUnitario) || 0;
+  const precio = Number(precioUnitario) || 0;
+  const total = cant * precio;
+  const gananciaTotal = cant * (precio - costo);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,16 +106,17 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
       toast.error("El nombre del producto es obligatorio");
       return;
     }
-    const cant = parseInt(cantidad);
-    if (isNaN(cant) || cant <= 0) {
+    const cantVal = parseInt(cantidad);
+    if (isNaN(cantVal) || cantVal <= 0) {
       toast.error("La cantidad debe ser mayor a 0");
       return;
     }
-    const precio = parseFloat(precioUnitario);
-    if (isNaN(precio) || precio <= 0) {
-      toast.error("El precio debe ser mayor a 0");
+    const precioVal = parseFloat(precioUnitario);
+    if (isNaN(precioVal) || precioVal <= 0) {
+      toast.error("El precio de venta debe ser mayor a 0");
       return;
     }
+    const costoVal = parseFloat(costoUnitario) || 0;
 
     setLoading(true);
     try {
@@ -115,8 +124,9 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
         fecha,
         producto_id: productoId && productoId !== "manual" ? productoId : null,
         producto_nombre: productoNombre.trim(),
-        cantidad: cant,
-        precio_unitario: precio,
+        cantidad: cantVal,
+        costo_unitario: costoVal,
+        precio_unitario: precioVal,
         metodo_pago: metodoPago || "efectivo",
         notas: notas.trim() || undefined,
       };

@@ -8,6 +8,8 @@ import {
   BarChart3,
   Wallet,
   Store,
+  Users,
+  CalendarDays,
 } from "lucide-react";
 
 import {
@@ -69,6 +71,16 @@ const items: NavItem[] = [
       { title: "Inventario", url: "/renashop/inventario" },
       { title: "Reportes", url: "/renashop/reportes" },
     ],
+  },
+  {
+    title: "Personas",
+    url: "/personas",
+    icon: Users,
+  },
+  {
+    title: "Actividades",
+    url: "/actividades",
+    icon: CalendarDays,
   },
   {
     title: "Reportes",

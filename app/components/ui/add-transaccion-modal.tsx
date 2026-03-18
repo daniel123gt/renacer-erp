@@ -23,6 +23,7 @@ import {
   type TransaccionInput,
   type Transaccion,
 } from "~/services/finanzasService";
+import { PersonaCombobox } from "~/components/ui/persona-combobox";
 
 interface Props {
   open: boolean;
@@ -34,7 +35,6 @@ interface Props {
 
 const METODOS_PAGO = [
   { value: "efectivo", label: "Efectivo" },
-  { value: "yape", label: "Yape" },
   { value: "plin", label: "Plin" },
   { value: "transferencia", label: "Transferencia" },
   { value: "otro", label: "Otro" },
@@ -186,10 +186,10 @@ export function AddTransaccionModal({ open, onOpenChange, tipo, onSuccess, editD
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Persona (opcional)</Label>
-              <Input
-                placeholder="Nombre"
+              <PersonaCombobox
                 value={persona}
-                onChange={(e) => setPersona(e.target.value)}
+                onValueChange={setPersona}
+                placeholder="Buscar persona..."
               />
             </div>
             <div>
