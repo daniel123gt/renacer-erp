@@ -112,61 +112,18 @@ export const finanzasService = {
   },
 
   async getFondoAnterior(year: number, month: number): Promise<number> {
-    let prevMonth = month - 1;
-    let prevYear = year;
-    if (prevMonth < 1) {
-      prevMonth = 12;
-      prevYear = year - 1;
-    }
-    const from = firstDayOfMonth(prevYear, prevMonth);
-    const to = lastDayOfMonth(prevYear, prevMonth);
-
+    const hasta = firstDayOfMonth(year, month);
     const { data, error } = await supabase
       .from("transacciones")
       .select("tipo, monto")
-      .gte("fecha", from)
-      .lte("fecha", to);
+      .lt("fecha", hasta);
     if (error) return 0;
-
-    let entradas = 0;
-    let salidas = 0;
+    let saldo = 0;
     (data ?? []).forEach((row: any) => {
-      const monto = Number(row.monto);
-      if (row.tipo === "entrada") entradas += monto;
-      else salidas += monto;
+      const m = Number(row.monto);
+      saldo += row.tipo === "entrada" ? m : -m;
     });
-
-    const fondoPrevio = await this.getFondoAnteriorRecursivo(prevYear, prevMonth);
-    return fondoPrevio + entradas - salidas;
-  },
-
-  async getFondoAnteriorRecursivo(year: number, month: number): Promise<number> {
-    let prevMonth = month - 1;
-    let prevYear = year;
-    if (prevMonth < 1) {
-      prevMonth = 12;
-      prevYear = year - 1;
-    }
-    const from = firstDayOfMonth(prevYear, prevMonth);
-    const to = lastDayOfMonth(prevYear, prevMonth);
-
-    const { data, error } = await supabase
-      .from("transacciones")
-      .select("tipo, monto")
-      .gte("fecha", from)
-      .lte("fecha", to);
-
-    if (error || !data || data.length === 0) return 0;
-
-    let entradas = 0;
-    let salidas = 0;
-    data.forEach((row: any) => {
-      const monto = Number(row.monto);
-      if (row.tipo === "entrada") entradas += monto;
-      else salidas += monto;
-    });
-
-    return entradas - salidas;
+    return saldo;
   },
 
   async crear(input: TransaccionInput): Promise<Transaccion> {
