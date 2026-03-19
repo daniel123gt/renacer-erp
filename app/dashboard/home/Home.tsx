@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
+import { Card, CardContent } from "~/components/ui/card";
 import { useAuthStore } from "~/store/authStore";
 import {
-  Package,
   BarChart3,
   Settings,
   ArrowRight,
@@ -17,6 +15,8 @@ import {
 } from "lucide-react";
 import { getAppName } from "~/lib/erpBranding";
 import { finanzasService, type BalanceMensual } from "~/services/finanzasService";
+import { personasService, type Persona } from "~/services/personasService";
+import { BirthdayCalendar } from "~/components/ui/birthday-calendar";
 
 function formatMoney(n: number): string {
   return n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -26,6 +26,40 @@ const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
+
+const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+/** Lunes = 0 … Domingo = 6 */
+function mondayBasedWeekday(d: Date): number {
+  const sun = d.getDay();
+  return sun === 0 ? 6 : sun - 1;
+}
+
+function daysInMonth(year: number, monthIndex0: number): number {
+  return new Date(year, monthIndex0 + 1, 0).getDate();
+}
+
+function buildBirthdayMapForMonth(
+  personas: Persona[],
+  year: number,
+  monthIndex0: number
+): Map<number, Persona[]> {
+  const month1to12 = monthIndex0 + 1;
+  const maxDay = daysInMonth(year, monthIndex0);
+  const map = new Map<number, Persona[]>();
+  for (const p of personas) {
+    if (p.cumple_mes !== month1to12 || p.cumple_dia == null) continue;
+    const d = p.cumple_dia;
+    if (d < 1 || d > maxDay) continue;
+    const list = map.get(d) ?? [];
+    list.push(p);
+    map.set(d, list);
+  }
+  for (const [, list] of map) {
+    list.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }
+  return map;
+}
 
 const quickAccess = [
   {
@@ -70,6 +104,8 @@ export default function HomeDashboard() {
   const now = new Date();
   const [balance, setBalance] = useState<BalanceMensual | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(true);
+  const [personasCumple, setPersonasCumple] = useState<Persona[]>([]);
+  const [loadingCumples, setLoadingCumples] = useState(true);
 
   useEffect(() => {
     setLoadingBalance(true);
@@ -78,6 +114,27 @@ export default function HomeDashboard() {
       .then(setBalance)
       .catch(() => setBalance(null))
       .finally(() => setLoadingBalance(false));
+  }, []);
+
+  useEffect(() => {
+    setLoadingCumples(true);
+    personasService
+      .listActivos()
+      .then((list) =>
+        setPersonasCumple(
+          list.filter(
+            (p) =>
+              p.cumple_dia != null &&
+              p.cumple_mes != null &&
+              p.cumple_mes >= 1 &&
+              p.cumple_mes <= 12 &&
+              p.cumple_dia >= 1 &&
+              p.cumple_dia <= 31
+          )
+        )
+      )
+      .catch(() => setPersonasCumple([]))
+      .finally(() => setLoadingCumples(false));
   }, []);
 
   return (
@@ -170,6 +227,20 @@ export default function HomeDashboard() {
             </Card>
           ))}
         </div>
+      </div>
+
+      {/* Calendario de cumpleaños (react-big-calendar) */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">Cumpleaños</h2>
+        <Card>
+          <CardContent className="pt-6 pb-5">
+            <BirthdayCalendar
+              personas={personasCumple}
+              loading={loadingCumples}
+              onNuevaPersona={() => navigate("/personas")}
+            />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

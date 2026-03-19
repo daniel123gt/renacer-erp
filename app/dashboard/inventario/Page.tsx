@@ -297,6 +297,7 @@ export default function InventarioPage() {
             <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-14"></TableHead>
                 <TableHead>Producto</TableHead>
                 <TableHead>Categoría</TableHead>
                 <TableHead>Stock</TableHead>
@@ -311,6 +312,19 @@ export default function InventarioPage() {
             <TableBody>
               {paginatedRows.map((item) => (
                 <TableRow key={item.id}>
+                  <TableCell className="w-14">
+                    {item.imageUrl ? (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        className="w-10 h-10 object-cover rounded border"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded border bg-gray-100 flex items-center justify-center">
+                        <Package className="w-5 h-5 text-gray-400" />
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <div>
                       <p className="font-medium">{item.name}</p>

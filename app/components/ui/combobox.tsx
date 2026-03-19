@@ -21,6 +21,8 @@ import {
 export interface ComboboxOption {
   value: string;
   label: string;
+  /** URL de imagen para mostrar miniatura (ej. productos) */
+  imageUrl?: string;
 }
 
 interface ComboboxProps {
@@ -55,10 +57,9 @@ export function Combobox({
     return options;
   }, [emptyOption, options]);
 
-  const selectedLabel = React.useMemo(() => {
+  const selectedOption = React.useMemo(() => {
     if (!value) return null;
-    const opt = allOptions.find((o) => o.value === value);
-    return opt?.label ?? value;
+    return allOptions.find((o) => o.value === value) ?? null;
   }, [value, allOptions]);
 
   const handleSelect = (val: string) => {
@@ -77,12 +78,19 @@ export function Combobox({
           disabled={disabled}
           className={cn(
             "w-full justify-between font-normal h-10 px-3 py-2 text-sm",
-            !selectedLabel && "text-muted-foreground",
+            !selectedOption && "text-muted-foreground",
             className
           )}
         >
-          <span className="truncate">
-            {selectedLabel ?? placeholder}
+          <span className="flex items-center gap-2 truncate min-w-0">
+            {selectedOption?.imageUrl && (
+              <img
+                src={selectedOption.imageUrl}
+                alt=""
+                className="w-6 h-6 object-cover rounded shrink-0"
+              />
+            )}
+            <span className="truncate">{selectedOption?.label ?? placeholder}</span>
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -104,14 +112,22 @@ export function Combobox({
                   key={opt.value}
                   value={opt.label}
                   onSelect={() => handleSelect(opt.value)}
+                  className="flex items-center gap-2"
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "h-4 w-4 shrink-0",
                       value === opt.value ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {opt.label}
+                  {opt.imageUrl ? (
+                    <img
+                      src={opt.imageUrl}
+                      alt=""
+                      className="w-8 h-8 object-cover rounded shrink-0"
+                    />
+                  ) : null}
+                  <span className="truncate">{opt.label}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

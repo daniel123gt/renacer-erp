@@ -127,9 +127,17 @@ export function ViewInventoryModal({ item }: ViewInventoryModalProps) {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                  <div className="p-3 bg-primary-blue/10 rounded-full">
-                    <Package className="w-6 h-6 text-primary-blue" />
-                  </div>
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-16 h-16 object-cover rounded-lg border-2 border-primary-blue/20"
+                    />
+                  ) : (
+                    <div className="p-3 bg-primary-blue/10 rounded-full">
+                      <Package className="w-6 h-6 text-primary-blue" />
+                    </div>
+                  )}
                   <div>
                     <h3 className="text-xl font-bold text-primary-blue">
                       {item.name}

@@ -21,8 +21,13 @@ import {
   AlertCircle,
   Building2,
   Loader2,
+  ImagePlus,
+  X,
 } from "lucide-react";
+import React from "react";
 import type { InventoryItem } from "~/services/inventoryService";
+import { uploadProductImage } from "~/utils/uploadProductImage";
+import { toast } from "sonner";
 
 interface EditInventoryModalProps {
   item: InventoryItem;
@@ -51,10 +56,14 @@ const units = [
 export function EditInventoryModal({ item, onInventoryUpdated }: EditInventoryModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [formData, setFormData] = useState<InventoryItem>(item);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
+  const imageInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setFormData(item);
+    setLocalPreviewUrl(null);
   }, [item]);
 
   const handleInputChange = (field: string, value: string | number) => {
@@ -62,6 +71,35 @@ export function EditInventoryModal({ item, onInventoryUpdated }: EditInventoryMo
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    const objectUrl = URL.createObjectURL(file);
+    setLocalPreviewUrl(objectUrl);
+    setUploadingImage(true);
+    try {
+      const url = await uploadProductImage(file, item.id);
+      const nextItem: InventoryItem = {
+        ...formData,
+        imageUrl: url,
+        status: calculateStatus(formData.currentStock, formData.minStock),
+      };
+      setFormData(nextItem);
+      const result = onInventoryUpdated(nextItem);
+      if (result && typeof (result as Promise<unknown>).then === "function") {
+        await result;
+      }
+      toast.success("Imagen actualizada");
+    } catch {
+      toast.error("No se pudo guardar la imagen del producto");
+    } finally {
+      setUploadingImage(false);
+      setLocalPreviewUrl(null);
+      URL.revokeObjectURL(objectUrl);
+      e.target.value = "";
+    }
   };
 
   const calculateStatus = (current: number, min: number) => {
@@ -166,6 +204,53 @@ export function EditInventoryModal({ item, onInventoryUpdated }: EditInventoryMo
                   placeholder="Ej: Jeringas 10ml"
                   required
                 />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Foto del producto
+                </label>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageChange}
+                  />
+                  {(localPreviewUrl || formData.imageUrl) ? (
+                    <div className="relative">
+                      <img
+                        src={localPreviewUrl || formData.imageUrl || ""}
+                        alt="Producto"
+                        className="w-24 h-24 object-cover rounded-lg border"
+                      />
+                      {uploadingImage && (
+                        <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
+                          <Loader2 className="w-8 h-8 animate-spin text-white" />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleInputChange("imageUrl", "");
+                          setLocalPreviewUrl(null);
+                        }}
+                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={uploadingImage}
+                  >
+                    {uploadingImage ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Subiendo...</> : <><ImagePlus className="w-4 h-4 mr-1" /> Subir foto</>}
+                  </Button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

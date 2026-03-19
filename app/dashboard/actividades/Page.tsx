@@ -19,6 +19,7 @@ import {
   type EstadoActividad,
 } from "~/services/actividadesService";
 import { AddActividadModal } from "~/components/ui/add-actividad-modal";
+import { getActividadHeroStyle } from "~/lib/actividadTipoHero";
 
 function formatMoney(n: number): string {
   return n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -147,12 +148,43 @@ export default function ActividadesPage() {
                 const metaRecaudacion = a.meta_cantidad * a.precio_unitario;
                 const estilo = ESTADO_STYLES[a.estado];
 
+                const hero = getActividadHeroStyle(a.tipo);
+
                 return (
-                  <Card key={a.id} className="hover:shadow-md transition-shadow group relative">
-                    <CardContent className="pt-6 space-y-4">
-                      <div className="flex items-start justify-between">
+                  <Card key={a.id} className="hover:shadow-md transition-shadow group relative overflow-hidden p-0">
+                    <div
+                      className={`relative h-40 sm:h-44 bg-gradient-to-br ${hero.gradientClass} flex items-center justify-center select-none`}
+                      aria-hidden
+                    >
+                      <span
+                        className="text-7xl sm:text-8xl drop-shadow-sm leading-none"
+                        style={{ lineHeight: 1 }}
+                      >
+                        {hero.emoji}
+                      </span>
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="h-8 w-8 p-0 bg-white/90 shadow-sm"
+                          onClick={() => openEdit(a)}
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="h-8 w-8 p-0 bg-white/90 shadow-sm text-red-600 hover:text-red-700"
+                          onClick={() => handleDelete(a)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                    <CardContent className="pt-4 pb-6 px-5 space-y-4">
+                      <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <Badge variant="secondary" className="text-xs">{a.tipo}</Badge>
                             <Badge className={`${estilo.bg} ${estilo.text} text-xs`}>{estilo.label}</Badge>
                           </div>
@@ -160,14 +192,6 @@ export default function ActividadesPage() {
                           {a.proposito && (
                             <p className="text-sm text-gray-500 truncate">{a.proposito}</p>
                           )}
-                        </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(a)}>
-                            <Edit className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700" onClick={() => handleDelete(a)}>
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
                         </div>
                       </div>
 

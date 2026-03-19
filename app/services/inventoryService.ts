@@ -17,6 +17,7 @@ export interface InventoryItem {
   lastRestocked: string;
   expiryDate?: string;
   status: InventoryStatus;
+  imageUrl?: string;
 }
 
 interface MaterialsRow {
@@ -35,6 +36,7 @@ interface MaterialsRow {
   unit?: string | null;
   last_restocked?: string | null;
   expiry_date?: string | null;
+  imagen_url?: string | null;
 }
 
 function computeStatus(
@@ -73,11 +75,12 @@ function rowToItem(r: MaterialsRow): InventoryItem {
       : "",
     expiryDate: r.expiry_date ? String(r.expiry_date).slice(0, 10) : undefined,
     status,
+    imageUrl: r.imagen_url ?? undefined,
   };
 }
 
 const MATERIALS_SELECT =
-  "id, name, cost_soles, precio_venta, is_active, stock, proveedor, estado, categoria, description, min_stock, max_stock, unit, last_restocked, expiry_date";
+  "id, name, cost_soles, precio_venta, is_active, stock, proveedor, estado, categoria, description, min_stock, max_stock, unit, last_restocked, expiry_date, imagen_url";
 
 export interface ListInventoryResult {
   data: InventoryItem[];
@@ -147,6 +150,7 @@ export const inventoryService = {
         unit: item.unit?.trim() || "unidades",
         last_restocked: item.lastRestocked?.trim() || null,
         expiry_date: item.expiryDate?.trim() || null,
+        imagen_url: item.imageUrl?.trim() || null,
       })
       .select()
       .single();
@@ -179,6 +183,7 @@ export const inventoryService = {
         unit: item.unit?.trim() || "unidades",
         last_restocked: item.lastRestocked?.trim() || null,
         expiry_date: item.expiryDate?.trim() || null,
+        imagen_url: item.imageUrl?.trim() || null,
       })
       .eq("id", item.id)
       .select()

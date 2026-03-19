@@ -185,6 +185,7 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
               options={productos.map((p) => ({
                 value: p.id,
                 label: `${p.name} — S/ ${p.salePrice.toFixed(2)} (${p.currentStock} disp.)`,
+                imageUrl: p.imageUrl,
               }))}
             />
           </div>

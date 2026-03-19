@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { toast } from "sonner";
-import { 
-  Settings, 
-  User, 
-  Shield, 
-  Database, 
-  Bell, 
+import { appConfigService } from "~/services/appConfigService";
+import {
+  Settings,
+  User,
+  Shield,
+  Database,
+  Bell,
   Palette,
   Globe,
   Key,
@@ -19,7 +20,8 @@ import {
   Upload,
   Trash2,
   Eye,
-  EyeOff
+  EyeOff,
+  Wallet,
 } from "lucide-react";
 
 interface SystemConfig {
@@ -122,6 +124,46 @@ export default function ConfiguracionPage() {
   const [editValue, setEditValue] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
+
+  const [cuotaAlquiler, setCuotaAlquiler] = useState<string>("275");
+  const [loadingCuota, setLoadingCuota] = useState(true);
+  const [savingCuota, setSavingCuota] = useState(false);
+
+  useEffect(() => {
+    let ok = true;
+    setLoadingCuota(true);
+    appConfigService
+      .getCuotaAlquiler()
+      .then((n) => {
+        if (ok) setCuotaAlquiler(String(n));
+      })
+      .catch(() => {
+        if (ok) toast.error("No se pudo cargar la cuota de alquiler");
+      })
+      .finally(() => {
+        if (ok) setLoadingCuota(false);
+      });
+    return () => {
+      ok = false;
+    };
+  }, []);
+
+  const handleGuardarCuota = async () => {
+    const n = parseFloat(cuotaAlquiler.replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0) {
+      toast.error("Ingresa un monto válido mayor a 0");
+      return;
+    }
+    setSavingCuota(true);
+    try {
+      await appConfigService.setCuotaAlquiler(n);
+      toast.success("Cuota de alquiler guardada");
+    } catch {
+      toast.error("Error al guardar la cuota");
+    } finally {
+      setSavingCuota(false);
+    }
+  };
 
   const filteredConfigs = configs.filter(config => {
     const matchesSearch = config.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -307,6 +349,42 @@ export default function ConfiguracionPage() {
 
   return (
     <div className="space-y-6">
+      <Card className="border-primary-blue/20 bg-primary-blue/5">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Wallet className="w-5 h-5" />
+            Finanzas y alertas (servidor)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-gray-600">
+            <strong>Cuota de alquiler (S/)</strong> se usa para las notificaciones automáticas los{" "}
+            <strong>jueves desde las 16:00</strong> (hora Lima): si el saldo del mes es menor que esta
+            cuota, se registra una alerta cada hora. Valor por defecto: 275.
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label htmlFor="cuota-alquiler" className="text-xs font-medium text-gray-500 block mb-1">
+                Cuota alquiler (S/)
+              </label>
+              <Input
+                id="cuota-alquiler"
+                type="text"
+                inputMode="decimal"
+                className="w-40"
+                disabled={loadingCuota || savingCuota}
+                value={cuotaAlquiler}
+                onChange={(e) => setCuotaAlquiler(e.target.value)}
+              />
+            </div>
+            <Button onClick={() => void handleGuardarCuota()} disabled={loadingCuota || savingCuota}>
+              {savingCuota ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Guardar cuota
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
