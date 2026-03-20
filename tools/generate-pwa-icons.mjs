@@ -1,8 +1,10 @@
 /**
- * Genera PNG para PWA / favicon / logo en public/.
- * Colores desde app/erp-branding.config.json (primaryColor).
- * Ejecutar: node tools/generate-pwa-icons.mjs
- * (También se invoca desde `npm run build`.)
+ * Iconos PWA (instalar app): public/icons/icon-192.png e icon-512.png
+ *
+ * Si existe public/logo.png → se redimensionan desde TU logo (encajan en cuadrado, centrado, fondo transparente).
+ * NO modifica logo.png ni logo-light-large.png.
+ *
+ * Si no hay logo.png → solo crea iconos de color sólido si faltan (marcador mínimo).
  */
 import { PNG } from "pngjs";
 import fs from "fs";
@@ -32,70 +34,65 @@ try {
 }
 
 const bg = hexToRgb(primary);
-/** Cruz / símbolo claro sobre fondo marca */
-const fg = { r: 216, g: 223, b: 214 };
 
-function isPlus(x, y, cx, cy, arm, thick) {
-  const dx = x - cx;
-  const dy = y - cy;
-  const hBar = Math.abs(dy) <= thick / 2 && Math.abs(dx) <= arm;
-  const vBar = Math.abs(dx) <= thick / 2 && Math.abs(dy) <= arm;
-  return hBar || vBar;
+function readPng(filePath) {
+  return new Promise((resolve, reject) => {
+    fs.createReadStream(filePath)
+      .pipe(new PNG())
+      .on("parsed", function () {
+        resolve(this);
+      })
+      .on("error", reject);
+  });
 }
 
-/** Icono app: fondo sólido + cruz */
-function drawAppIcon(size) {
-  const png = new PNG({ width: size, height: size });
-  const cx = size / 2;
-  const cy = size / 2;
-  const arm = size * 0.22;
-  const thick = Math.max(6, Math.round(size * 0.065));
-  const pad = Math.round(size * 0.06);
+/** Escala el logo para caber en size×size, centrado; márgenes transparentes. */
+function fitLogoToSquare(src, size) {
+  const dst = new PNG({ width: size, height: size });
+  for (let i = 0; i < size * size * 4; i += 4) {
+    dst.data[i] = 0;
+    dst.data[i + 1] = 0;
+    dst.data[i + 2] = 0;
+    dst.data[i + 3] = 0;
+  }
 
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (size * y + x) << 2;
-      const inside = x >= pad && x < size - pad && y >= pad && y < size - pad;
-      let r = bg.r;
-      let g = bg.g;
-      let b = bg.b;
-      let a = 255;
-      if (inside && isPlus(x, y, cx, cy, arm, thick)) {
-        r = fg.r;
-        g = fg.g;
-        b = fg.b;
-      }
-      png.data[idx] = r;
-      png.data[idx + 1] = g;
-      png.data[idx + 2] = b;
-      png.data[idx + 3] = a;
+  const sw = src.width;
+  const sh = src.height;
+  if (sw < 1 || sh < 1) return dst;
+
+  const scale = Math.min(size / sw, size / sh);
+  const nw = Math.max(1, Math.round(sw * scale));
+  const nh = Math.max(1, Math.round(sh * scale));
+  const ox = Math.floor((size - nw) / 2);
+  const oy = Math.floor((size - nh) / 2);
+
+  for (let y = 0; y < nh; y++) {
+    for (let x = 0; x < nw; x++) {
+      const sx = Math.min(sw - 1, Math.floor((x / nw) * sw));
+      const sy = Math.min(sh - 1, Math.floor((y / nh) * sh));
+      const sidx = (sw * sy + sx) << 2;
+      const dx = ox + x;
+      const dy = oy + y;
+      if (dx < 0 || dx >= size || dy < 0 || dy >= size) continue;
+      const didx = (size * dy + dx) << 2;
+      dst.data[didx] = src.data[sidx];
+      dst.data[didx + 1] = src.data[sidx + 1];
+      dst.data[didx + 2] = src.data[sidx + 2];
+      dst.data[didx + 3] = src.data[sidx + 3];
     }
   }
-  return png;
+  return dst;
 }
 
-/** Logo claro para sidebar (fondo transparente, solo cruz en color claro) */
-function drawLightLogo(size) {
+function drawSolidIcon(size) {
   const png = new PNG({ width: size, height: size });
-  const cx = size / 2;
-  const cy = size / 2;
-  const arm = size * 0.2;
-  const thick = Math.max(8, Math.round(size * 0.07));
-
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const idx = (size * y + x) << 2;
-      if (isPlus(x, y, cx, cy, arm, thick)) {
-        png.data[idx] = fg.r;
-        png.data[idx + 1] = fg.g;
-        png.data[idx + 2] = fg.b;
-        png.data[idx + 3] = 255;
-      } else {
-        png.data[idx] = 0;
-        png.data[idx + 1] = 0;
-        png.data[idx + 2] = 0;
-        png.data[idx + 3] = 0;
-      }
+      png.data[idx] = bg.r;
+      png.data[idx + 1] = bg.g;
+      png.data[idx + 2] = bg.b;
+      png.data[idx + 3] = 255;
     }
   }
   return png;
@@ -115,14 +112,37 @@ async function main() {
   const iconsDir = path.join(root, "public", "icons");
   fs.mkdirSync(iconsDir, { recursive: true });
 
-  const tasks = [
-    writePng(drawAppIcon(192), path.join(iconsDir, "icon-192.png")),
-    writePng(drawAppIcon(512), path.join(iconsDir, "icon-512.png")),
-    writePng(drawAppIcon(192), path.join(root, "public", "logo.png")),
-    writePng(drawLightLogo(512), path.join(root, "public", "logo-light-large.png")),
-  ];
+  const logoPath = path.join(root, "public", "logo.png");
+  const p192 = path.join(iconsDir, "icon-192.png");
+  const p512 = path.join(iconsDir, "icon-512.png");
+
+  if (fs.existsSync(logoPath)) {
+    try {
+      const src = await readPng(logoPath);
+      await Promise.all([
+        writePng(fitLogoToSquare(src, 192), p192),
+        writePng(fitLogoToSquare(src, 512), p512),
+      ]);
+      console.log("PWA: icon-192.png e icon-512.png generados desde public/logo.png");
+      return;
+    } catch (e) {
+      console.warn("No se pudo leer public/logo.png como PNG, usando marcador:", e.message);
+    }
+  }
+
+  const tasks = [];
+  if (!fs.existsSync(p192)) {
+    tasks.push(writePng(drawSolidIcon(192), p192));
+  }
+  if (!fs.existsSync(p512)) {
+    tasks.push(writePng(drawSolidIcon(512), p512));
+  }
   await Promise.all(tasks);
-  console.log("PWA icons + logo.png + logo-light-large.png generados en public/");
+  if (tasks.length > 0) {
+    console.log("PWA: iconos de color sólido (añade public/logo.png para usar tu marca).");
+  } else if (!fs.existsSync(logoPath)) {
+    console.log("public/icons/: sin cambios (ya existían iconos y no hay logo.png).");
+  }
 }
 
 main().catch((e) => {

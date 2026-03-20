@@ -17,7 +17,7 @@ import { signInWithEmail } from "~/services/authService";
 import { useLoadingStore } from "~/store/loadingStore";
 import { useAuthStore } from "~/store/authStore";
 import { useNavigate } from "react-router";
-import { getAppName, getLogoPath } from "~/lib/erpBranding";
+import { getAppName, getLogoLightPath } from "~/lib/erpBranding";
 
 const formSchema = z.object({
   email: z.string().email({
@@ -77,7 +77,7 @@ export default function AuthPage() {
     <div className="flex flex-col lg:grid lg:grid-cols-12 min-h-dvh">
       <div className="flex-1 flex flex-col gap-8 lg:gap-12 justify-center items-center bg-soft-blue lg:col-span-8 px-4 py-12 sm:px-6 relative z-10">
         <div className="flex flex-col items-center gap-4 lg:hidden">
-          <img src="/logo-light-large.png" alt={getAppName()} className="w-20 h-20 rounded-2xl shadow-lg bg-primary-blue p-2" />
+          <img src={getLogoLightPath()} alt={getAppName()} className="w-20 h-20 rounded-2xl shadow-lg bg-primary-blue p-2" />
         </div>
         <h1 className="text-4xl sm:text-5xl lg:text-6xl text-center font-bold text-primary-blue uppercase max-w-[400px]">
           {getAppName()} ERP
@@ -144,7 +144,7 @@ export default function AuthPage() {
       </div>
       <div className="hidden lg:flex lg:col-span-4 bg-primary-blue justify-center items-center p-12">
         <figure className="flex justify-center items-center">
-          <img src="/logo-light-large.png" alt={getAppName()} className="w-3/4 max-w-[280px] rounded-3xl" />
+          <img src={getLogoLightPath()} alt={getAppName()} className="w-3/4 max-w-[280px] rounded-3xl" />
         </figure>
       </div>
       <div className="absolute bottom-0 left-0 hidden sm:block">

@@ -1,0 +1,12 @@
+LOGOS DEL ERP
+
+  logo.png
+    → Favicon, notificaciones, branding por defecto.
+    → Al hacer npm run build, también se generan desde aquí los iconos PWA:
+      public/icons/icon-192.png y icon-512.png (mismo diseño, tamaños correctos).
+
+  logo-light-large.png
+    → Menú lateral y pantalla de login (fondo oscuro).
+
+No edites a mano icon-192 / icon-512 salvo que quieras algo distinto del logo.png;
+el build los vuelve a crear desde logo.png.

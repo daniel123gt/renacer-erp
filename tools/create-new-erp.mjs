@@ -98,6 +98,7 @@ function applyBrandingConfig(targetDir, options) {
     accentColor: options.accent,
     secondaryColor: options.secondary,
     logoPath: options.logo,
+    logoLightPath: "/logo-light-large.png",
     faviconPath: options.logo,
   };
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf8");

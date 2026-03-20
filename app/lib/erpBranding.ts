@@ -13,6 +13,8 @@ export interface ErpBrandingConfig {
   accentColor: string;
   secondaryColor?: string;
   logoPath: string;
+  /** Logo para fondos oscuros (sidebar, login). Si no existe, se usa `logoPath`. Coloca el PNG en `public/`; no lo genera el script de iconos PWA. */
+  logoLightPath?: string;
   faviconPath?: string;
 }
 
@@ -60,6 +62,12 @@ export function getSecondaryColor(): string {
 /** Ruta del logo (sidebar, header). */
 export function getLogoPath(): string {
   return loadBranding().logoPath;
+}
+
+/** Logo sobre fondo oscuro (menú lateral, pantalla login). Por defecto = logo principal. */
+export function getLogoLightPath(): string {
+  const b = loadBranding();
+  return b.logoLightPath ?? b.logoPath;
 }
 
 /** Ruta del favicon. */

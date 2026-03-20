@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "icons": "node tools/generate-pwa-icons.mjs",
-    "postinstall": "node tools/generate-pwa-icons.mjs",
     "build": "node tools/generate-pwa-icons.mjs && node tools/write-build-version.mjs && react-router build",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
