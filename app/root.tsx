@@ -12,12 +12,13 @@ import { Toaster } from "~/components/ui/sonner";
 import { VersionUpdateBanner } from "~/components/VersionUpdateBanner";
 
 import type { Route } from "./+types/root";
+import { getFaviconPath } from "~/lib/erpBranding";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
-  { rel: "icon", type: "image/png", href: "/icons/icon-192.png", sizes: "192x192" },
+  { rel: "icon", type: "image/png", href: getFaviconPath() },
   { rel: "manifest", href: "/manifest.webmanifest" },
-  { rel: "apple-touch-icon", href: "/icons/icon-192.png", sizes: "180x180" },
+  { rel: "apple-touch-icon", href: getFaviconPath() },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",

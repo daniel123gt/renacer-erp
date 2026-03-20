@@ -25,7 +25,7 @@ const defaultBranding: ErpBrandingConfig = {
   accentColor: "#73CBCF",
   secondaryColor: "#3C5894",
   logoPath: "/logo.png",
-  faviconPath: "/logo.png",
+  faviconPath: "/icono.png",
 };
 
 let cached: ErpBrandingConfig = { ...defaultBranding, ...(brandingConfig as ErpBrandingConfig) };

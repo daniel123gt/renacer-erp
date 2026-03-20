@@ -14,6 +14,7 @@ import {
   type TipoNotificacion,
 } from "~/services/notificacionesService";
 import { isLikelyIOS, isStandaloneDisplayMode } from "~/lib/device";
+import { getFaviconPath } from "~/lib/erpBranding";
 
 const POLL_MS = 45_000;
 
@@ -111,7 +112,7 @@ export function NotificationBell() {
       // eslint-disable-next-line no-new
       new Notification(latestUnread.titulo, {
         body: latestUnread.cuerpo,
-        icon: "/logo.png",
+        icon: getFaviconPath(),
         tag: `renacer-${latestUnread.id}`,
       });
     } catch {
