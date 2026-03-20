@@ -16,6 +16,13 @@ export interface ErpBrandingConfig {
   /** Logo para fondos oscuros (sidebar, login). Si no existe, se usa `logoPath`. Coloca el PNG en `public/`; no lo genera el script de iconos PWA. */
   logoLightPath?: string;
   faviconPath?: string;
+  /**
+   * Color de la barra del navegador, título de la PWA en Windows y cromado móvil (meta theme-color).
+   * Si no se define, se usa primaryColor.
+   */
+  themeColor?: string;
+  /** Variante en modo oscuro del sistema (opcional). Si no hay, se usa themeColor o primaryColor. */
+  themeColorDark?: string;
 }
 
 const defaultBranding: ErpBrandingConfig = {
@@ -73,6 +80,18 @@ export function getLogoLightPath(): string {
 /** Ruta del favicon. */
 export function getFaviconPath(): string {
   return loadBranding().faviconPath ?? loadBranding().logoPath;
+}
+
+/** Color OS / barra de título PWA / theme-color (por defecto = verde marca). */
+export function getThemeColor(): string {
+  const b = loadBranding();
+  return b.themeColor ?? b.primaryColor;
+}
+
+/** theme-color cuando el usuario tiene modo oscuro (misma marca por defecto). */
+export function getThemeColorDark(): string {
+  const b = loadBranding();
+  return b.themeColorDark ?? b.themeColor ?? b.primaryColor;
 }
 
 /** Toda la config (para inyectar estilos o usar en un solo lugar). */

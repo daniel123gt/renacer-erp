@@ -12,7 +12,7 @@ import { Toaster } from "~/components/ui/sonner";
 import { VersionUpdateBanner } from "~/components/VersionUpdateBanner";
 
 import type { Route } from "./+types/root";
-import { getFaviconPath } from "~/lib/erpBranding";
+import { getFaviconPath, getShortName, getThemeColor, getThemeColorDark } from "~/lib/erpBranding";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
@@ -38,11 +38,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#1e40af" />
+        {/* Barra del navegador / título PWA (Windows) / cromado Android; alineado a la paleta ERP */}
+        <meta name="theme-color" content={getThemeColor()} media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content={getThemeColorDark()} media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content={getThemeColor()} />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
+        {/*
+          default = barra de estado clara (texto oscuro), encaja si el contenido superior es blanco.
+          black-translucent = la web dibuja bajo la hora/batería (mejor con cabecera verde + safe-area).
+        */}
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Renacer" />
+        <meta name="apple-mobile-web-app-title" content={getShortName()} />
         <Meta />
         <Links />
       </head>
