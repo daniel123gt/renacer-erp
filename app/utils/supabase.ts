@@ -12,6 +12,25 @@ if (!supabaseKey) {
   throw new Error('VITE_SUPABASE_ANON_KEY no está definida en las variables de entorno');
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+/**
+ * persistSession + autoRefreshToken: la sesión se guarda (p. ej. localStorage) y el access
+ * token se renueva solo mientras el refresh token sea válido (comportamiento tipo “Facebook”).
+ * La pantalla “User sessions” de Pro es otra cosa (forzar cierre tras X tiempo).
+ */
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
+
+if (typeof window !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      void supabase.auth.getSession();
+    }
+  });
+}
 
 export default supabase;
