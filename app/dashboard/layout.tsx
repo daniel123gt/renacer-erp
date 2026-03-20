@@ -30,15 +30,15 @@ export default function Layout() {
   const navigate = useNavigate();
   const [checkingSession, setCheckingSession] = useState(true);
 
-  if (!hasHydrated) {
-    return <Loading />;
-  }
-
-  if (!user) {
-    return <Navigate to={"login"} replace />;
-  }
-
+  // Los hooks deben ejecutarse siempre en el mismo orden (nunca después de un return condicional).
   useEffect(() => {
+    if (!hasHydrated) return;
+
+    if (!user) {
+      setCheckingSession(false);
+      return;
+    }
+
     setCheckingSession(true);
     let alive = true;
 
@@ -91,7 +91,9 @@ export default function Layout() {
 
     void validateSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
       if (!alive) return;
       if (event === "SIGNED_OUT" || event === "TOKEN_REFRESH_FAILED") {
         logoutUser();
@@ -103,7 +105,15 @@ export default function Layout() {
       alive = false;
       subscription.unsubscribe();
     };
-  }, [login, logoutUser, navigate]);
+  }, [hasHydrated, user, login, logoutUser, navigate]);
+
+  if (!hasHydrated) {
+    return <Loading />;
+  }
+
+  if (!user) {
+    return <Navigate to={"login"} replace />;
+  }
 
   if (checkingSession) {
     return <Loading />;

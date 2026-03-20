@@ -49,9 +49,9 @@ function formatMoney(n: number): string {
 }
 
 export default function FinanzasPage() {
-  const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
+  // Evita error de hidratación: SSR y primer paint del cliente deben coincidir (no usar new Date() en el estado inicial).
+  const [year, setYear] = useState<number | null>(null);
+  const [month, setMonth] = useState<number | null>(null);
   const [balance, setBalance] = useState<BalanceMensual | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -59,7 +59,14 @@ export default function FinanzasPage() {
   const [modalTipo, setModalTipo] = useState<"entrada" | "salida">("entrada");
   const [editingTx, setEditingTx] = useState<Transaccion | null>(null);
 
+  useEffect(() => {
+    const n = new Date();
+    setYear(n.getFullYear());
+    setMonth(n.getMonth() + 1);
+  }, []);
+
   const load = useCallback(() => {
+    if (year === null || month === null) return;
     setLoading(true);
     finanzasService
       .getBalanceMensual(year, month)
@@ -71,15 +78,24 @@ export default function FinanzasPage() {
       .finally(() => setLoading(false));
   }, [year, month]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (year === null || month === null) return;
+    load();
+  }, [year, month, load]);
 
   const prevMonth = () => {
-    if (month === 1) { setMonth(12); setYear(year - 1); }
-    else setMonth(month - 1);
+    if (year === null || month === null) return;
+    if (month === 1) {
+      setMonth(12);
+      setYear(year - 1);
+    } else setMonth(month - 1);
   };
   const nextMonth = () => {
-    if (month === 12) { setMonth(1); setYear(year + 1); }
-    else setMonth(month + 1);
+    if (year === null || month === null) return;
+    if (month === 12) {
+      setMonth(1);
+      setYear(year + 1);
+    } else setMonth(month + 1);
   };
 
   const openAddModal = (tipo: "entrada" | "salida") => {
@@ -106,7 +122,7 @@ export default function FinanzasPage() {
   };
 
   const handleExportCSV = () => {
-    if (!balance) return;
+    if (!balance || year === null || month === null) return;
     const all = [...balance.entradas, ...balance.salidas].sort(
       (a, b) => a.fecha.localeCompare(b.fecha)
     );
@@ -170,6 +186,28 @@ export default function FinanzasPage() {
       </TableCell>
     </TableRow>
   );
+
+  if (year === null || month === null) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Wallet className="w-7 h-7 text-primary-blue" />
+              Finanzas
+            </h1>
+            <p className="text-gray-600 mt-1">Balance mensual de la iglesia</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="py-16 text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-primary-blue mx-auto mb-4" />
+            <p className="text-gray-600">Preparando vista…</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
