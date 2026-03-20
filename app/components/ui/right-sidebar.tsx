@@ -3,13 +3,7 @@ import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import { getAppName, getLogoPath } from "~/lib/erpBranding";
-import {
-  User,
-  Settings,
-  Calendar,
-  Package,
-  Wallet,
-} from "lucide-react";
+import { Calendar, Package, Settings, User, Wallet } from "lucide-react";
 
 export function RightSidebar() {
   const { user } = useAuthStore();
@@ -124,3 +118,4 @@ export function RightSidebar() {
     </aside>
   );
 }
+

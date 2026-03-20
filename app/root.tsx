@@ -7,6 +7,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 import Loading from "./components/root/Loading/Loading";
+import { PwaServiceWorker } from "~/components/PwaServiceWorker";
 import { Toaster } from "~/components/ui/sonner";
 import { VersionUpdateBanner } from "~/components/VersionUpdateBanner";
 
@@ -15,6 +16,8 @@ import "./app.css";
 
 export const links: Route.LinksFunction = () => [
   { rel: "icon", type: "image/png", href: "/logo.png" },
+  { rel: "manifest", href: "/manifest.webmanifest" },
+  { rel: "apple-touch-icon", href: "/logo.png" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",
@@ -29,15 +32,20 @@ export const links: Route.LinksFunction = () => [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="es">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#1e40af" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Renacer" />
         <Meta />
         <Links />
       </head>
       <body>
         <Loading />
+        <PwaServiceWorker />
         {children}
         <Toaster richColors position="top-center" theme="light" />
         <VersionUpdateBanner />

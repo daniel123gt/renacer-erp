@@ -13,6 +13,7 @@ import {
   type NotificacionConEstado,
   type TipoNotificacion,
 } from "~/services/notificacionesService";
+import { isLikelyIOS, isStandaloneDisplayMode } from "~/lib/device";
 
 const POLL_MS = 45_000;
 
@@ -31,6 +32,13 @@ export function NotificationBell() {
     return Notification.permission;
   });
   const shownNativeIdsRef = useRef<Set<string>>(new Set());
+  const [iosDevice, setIosDevice] = useState(false);
+  const [standalonePwa, setStandalonePwa] = useState(false);
+
+  useEffect(() => {
+    setIosDevice(isLikelyIOS());
+    setStandalonePwa(isStandaloneDisplayMode());
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -99,8 +107,13 @@ export function NotificationBell() {
     try {
       // Se muestra solo una por refresh (la más reciente sin leer)
       // Nota: algunos navegadores requieren HTTPS y permiso concedido.
+      // En iPhone/iPad suele funcionar como banner del sistema solo si la app está en pantalla de inicio (PWA), iOS 16.4+.
       // eslint-disable-next-line no-new
-      new Notification(latestUnread.titulo, { body: latestUnread.cuerpo });
+      new Notification(latestUnread.titulo, {
+        body: latestUnread.cuerpo,
+        icon: "/logo.png",
+        tag: `renacer-${latestUnread.id}`,
+      });
     } catch {
       // Si no se puede (por políticas del navegador), no rompemos la UI.
     }
@@ -142,9 +155,21 @@ export function NotificationBell() {
         </div>
 
         {nativePermission !== "granted" && (
-          <div className="px-3 py-2 border-b border-gray-100">
-            <p className="text-xs text-gray-600 mb-2">
-              Para ver alertas nativas del sistema, permite notificaciones en tu navegador.
+          <div className="px-3 py-2 border-b border-gray-100 space-y-2">
+            {iosDevice && !standalonePwa && (
+              <div className="rounded-md bg-amber-50 border border-amber-200 px-2.5 py-2 text-[11px] text-amber-950 leading-snug">
+                <strong className="font-semibold">iPhone o iPad:</strong> Safari no muestra notificaciones del sistema
+                como en Windows si solo abres la web en una pestaña.{" "}
+                <span className="block mt-1">
+                  Toca <strong>Compartir</strong> → <strong>Añadir a pantalla de inicio</strong> y abre Renacer desde el
+                  icono (requiere <strong>iOS 16.4 o superior</strong>). Después pulsa abajo para permitir avisos.
+                </span>
+              </div>
+            )}
+            <p className="text-xs text-gray-600">
+              {iosDevice && standalonePwa
+                ? "Permite notificaciones para recibir avisos como en el resto de apps (banners de iOS)."
+                : "Para ver alertas nativas del sistema (banners), permite notificaciones en tu navegador."}
             </p>
             <Button
               type="button"

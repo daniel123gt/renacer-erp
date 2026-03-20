@@ -1,13 +1,15 @@
+import { useEffect, useState } from "react";
 import { SidebarProvider, useSidebar } from "~/components/ui/sidebar";
 import { AppSidebar } from "~/components/ui/app-sidebar";
 import { RightSidebar } from "~/components/ui/right-sidebar";
 import { useAuthStore } from "~/store/authStore";
-import { Navigate, Outlet } from "react-router";
+import { Navigate, Outlet, useNavigate } from "react-router";
 import Loading from "~/components/root/Loading/Loading";
 import { getPrimaryColor } from "~/lib/erpBranding";
 import { Menu } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { NotificationBell } from "~/components/ui/notification-bell";
+import supabase from "~/utils/supabase";
 
 function MobileMenuButton() {
   const { toggleSidebar } = useSidebar();
@@ -16,7 +18,7 @@ function MobileMenuButton() {
       variant="ghost"
       size="icon"
       onClick={toggleSidebar}
-      className="lg:hidden w-12 h-12 shrink-0"
+      className="lg:hidden mb-2 w-12 h-12 shrink-0"
     >
       <Menu className="!w-8 !h-8 text-primary-blue" />
     </Button>
@@ -24,7 +26,9 @@ function MobileMenuButton() {
 }
 
 export default function Layout() {
-  const { user, hasHydrated } = useAuthStore();
+  const { user, hasHydrated, logout: logoutUser, login } = useAuthStore();
+  const navigate = useNavigate();
+  const [checkingSession, setCheckingSession] = useState(true);
 
   if (!hasHydrated) {
     return <Loading />;
@@ -32,6 +36,77 @@ export default function Layout() {
 
   if (!user) {
     return <Navigate to={"login"} replace />;
+  }
+
+  useEffect(() => {
+    setCheckingSession(true);
+    let alive = true;
+
+    const mapToAppUser = (authUser: any) => {
+      const email = authUser?.email;
+      if (!authUser?.id || !email) return null;
+      return {
+        id: String(authUser.id),
+        email: String(email),
+        created_at: String(authUser.created_at ?? new Date().toISOString()),
+        user_metadata: authUser.user_metadata ?? {},
+      };
+    };
+
+    const validateSession = async () => {
+      try {
+        const {
+          data: { session },
+          error: sessionErr,
+        } = await supabase.auth.getSession();
+
+        if (sessionErr) throw sessionErr;
+        if (!session) {
+          if (!alive) return;
+          logoutUser();
+          navigate("/login");
+          return;
+        }
+
+        // Refresca el usuario en el store (por si el metadata cambió).
+        const { data: authData, error: userErr } = await supabase.auth.getUser();
+        if (userErr) throw userErr;
+        const appUser = mapToAppUser(authData?.user);
+        if (!appUser) {
+          logoutUser();
+          navigate("/login");
+          return;
+        }
+        if (!alive) return;
+        login(appUser);
+      } catch {
+        if (!alive) return;
+        logoutUser();
+        navigate("/login");
+      } finally {
+        if (!alive) return;
+        setCheckingSession(false);
+      }
+    };
+
+    void validateSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (!alive) return;
+      if (event === "SIGNED_OUT" || event === "TOKEN_REFRESH_FAILED") {
+        logoutUser();
+        navigate("/login");
+      }
+    });
+
+    return () => {
+      alive = false;
+      subscription.unsubscribe();
+    };
+  }, [login, logoutUser, navigate]);
+
+  if (checkingSession) {
+    return <Loading />;
   }
 
   return (

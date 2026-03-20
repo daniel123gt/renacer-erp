@@ -144,7 +144,11 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <div className="p-8 flex justify-center">
-              <img src="/logo-light-large.png" alt={getShortName()} className="w-2/3 rounded-2xl" />
+              <img
+                src="/logo-light-large.png"
+                alt={getShortName()}
+                className="w-2/3 rounded-2xl"
+              />
             </div>
           </SidebarGroupContent>
           
@@ -184,7 +188,7 @@ export function AppSidebar() {
                       >
                         <Link to={item.url}>
                           <item.icon color={isActive(item.url) ? "#abd9cd" : "white"} />
-                          <span className={isActive(item.url) ? "text-accent-blue" : ""}>
+                          <span className={cn(isActive(item.url) ? "text-accent-blue" : "")}>
                             {item.title}
                           </span>
                         </Link>
@@ -199,7 +203,7 @@ export function AppSidebar() {
                       open={isOpen}
                       onOpenChange={(open) => setOpenSection(open ? item.title : null)}
                     >
-                      <div className="flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none hover:bg-white/10 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-2 [&>span:last-child]:truncate">
+                      <div className="flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none hover:bg-white/10 [&>span:last-child]:truncate">
                         <Link
                           to={item.url}
                           className={cn(
@@ -209,7 +213,9 @@ export function AppSidebar() {
                           )}
                         >
                           <item.icon color={isActive(item.url) ? "#abd9cd" : "white"} className="size-5 shrink-0" />
-                          <span className="truncate">{item.title}</span>
+                          <span className="truncate">
+                            {item.title}
+                          </span>
                         </Link>
                         <CollapsibleTrigger asChild>
                           <button
