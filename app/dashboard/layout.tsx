@@ -4,7 +4,7 @@ import { AppSidebar } from "~/components/ui/app-sidebar";
 import { RightSidebar } from "~/components/ui/right-sidebar";
 import { useAuthStore } from "~/store/authStore";
 import { Navigate, Outlet, useNavigate } from "react-router";
-import Loading from "~/components/root/Loading/Loading";
+import { FullPageLoader } from "~/components/FullPageLoader";
 import { getPrimaryColor } from "~/lib/erpBranding";
 import { Menu } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -108,15 +108,15 @@ export default function Layout() {
   }, [hasHydrated, user, login, logoutUser, navigate]);
 
   if (!hasHydrated) {
-    return <Loading />;
+    return <FullPageLoader label="Preparando sesión…" />;
   }
 
   if (!user) {
-    return <Navigate to={"login"} replace />;
+    return <Navigate to={"/login"} replace />;
   }
 
   if (checkingSession) {
-    return <Loading />;
+    return <FullPageLoader label="Verificando sesión…" />;
   }
 
   return (
