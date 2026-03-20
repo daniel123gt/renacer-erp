@@ -1,10 +1,12 @@
 /**
- * Iconos PWA (instalar app): public/icons/icon-192.png e icon-512.png
+ * Iconos PWA: public/icons/icon-192.png e icon-512.png
  *
- * Si existe public/logo.png → se redimensionan desde TU logo (encajan en cuadrado, centrado, fondo transparente).
+ * Fuente (prioridad):
+ *   1) public/logo-light-large.png — versión clara / fondo blanco (preferida para el icono de la app)
+ *   2) public/logo.png
+ *
+ * Los iconos se generan sobre fondo blanco (mejor en inicio del SO).
  * NO modifica logo.png ni logo-light-large.png.
- *
- * Si no hay logo.png → solo crea iconos de color sólido si faltan (marcador mínimo).
  */
 import { PNG } from "pngjs";
 import fs from "fs";
@@ -46,14 +48,24 @@ function readPng(filePath) {
   });
 }
 
-/** Escala el logo para caber en size×size, centrado; márgenes transparentes. */
-function fitLogoToSquare(src, size) {
+function blendOverWhite(fr, fg, fb, fa) {
+  const a = fa / 255;
+  return [
+    Math.round(fr * a + 255 * (1 - a)),
+    Math.round(fg * a + 255 * (1 - a)),
+    Math.round(fb * a + 255 * (1 - a)),
+    255,
+  ];
+}
+
+/** Logo escalado centrado sobre cuadrado blanco (tamaño fijo para PWA). */
+function fitLogoOnWhiteSquare(src, size) {
   const dst = new PNG({ width: size, height: size });
   for (let i = 0; i < size * size * 4; i += 4) {
-    dst.data[i] = 0;
-    dst.data[i + 1] = 0;
-    dst.data[i + 2] = 0;
-    dst.data[i + 3] = 0;
+    dst.data[i] = 255;
+    dst.data[i + 1] = 255;
+    dst.data[i + 2] = 255;
+    dst.data[i + 3] = 255;
   }
 
   const sw = src.width;
@@ -71,14 +83,19 @@ function fitLogoToSquare(src, size) {
       const sx = Math.min(sw - 1, Math.floor((x / nw) * sw));
       const sy = Math.min(sh - 1, Math.floor((y / nh) * sh));
       const sidx = (sw * sy + sx) << 2;
+      const fr = src.data[sidx];
+      const fg = src.data[sidx + 1];
+      const fb = src.data[sidx + 2];
+      const fa = src.data[sidx + 3];
       const dx = ox + x;
       const dy = oy + y;
       if (dx < 0 || dx >= size || dy < 0 || dy >= size) continue;
+      const [r, g, b, a] = blendOverWhite(fr, fg, fb, fa);
       const didx = (size * dy + dx) << 2;
-      dst.data[didx] = src.data[sidx];
-      dst.data[didx + 1] = src.data[sidx + 1];
-      dst.data[didx + 2] = src.data[sidx + 2];
-      dst.data[didx + 3] = src.data[sidx + 3];
+      dst.data[didx] = r;
+      dst.data[didx + 1] = g;
+      dst.data[didx + 2] = b;
+      dst.data[didx + 3] = a;
     }
   }
   return dst;
@@ -108,25 +125,33 @@ function writePng(png, filePath) {
   });
 }
 
+function pickSourceLogoPath() {
+  const light = path.join(root, "public", "logo-light-large.png");
+  const main = path.join(root, "public", "logo.png");
+  if (fs.existsSync(light)) return { path: light, label: "public/logo-light-large.png" };
+  if (fs.existsSync(main)) return { path: main, label: "public/logo.png" };
+  return null;
+}
+
 async function main() {
   const iconsDir = path.join(root, "public", "icons");
   fs.mkdirSync(iconsDir, { recursive: true });
 
-  const logoPath = path.join(root, "public", "logo.png");
   const p192 = path.join(iconsDir, "icon-192.png");
   const p512 = path.join(iconsDir, "icon-512.png");
 
-  if (fs.existsSync(logoPath)) {
+  const picked = pickSourceLogoPath();
+  if (picked) {
     try {
-      const src = await readPng(logoPath);
+      const src = await readPng(picked.path);
       await Promise.all([
-        writePng(fitLogoToSquare(src, 192), p192),
-        writePng(fitLogoToSquare(src, 512), p512),
+        writePng(fitLogoOnWhiteSquare(src, 192), p192),
+        writePng(fitLogoOnWhiteSquare(src, 512), p512),
       ]);
-      console.log("PWA: icon-192.png e icon-512.png generados desde public/logo.png");
+      console.log(`PWA: icon-192 e icon-512 generados desde ${picked.label} (fondo blanco).`);
       return;
     } catch (e) {
-      console.warn("No se pudo leer public/logo.png como PNG, usando marcador:", e.message);
+      console.warn(`No se pudo leer ${picked.label}:`, e.message);
     }
   }
 
@@ -139,9 +164,9 @@ async function main() {
   }
   await Promise.all(tasks);
   if (tasks.length > 0) {
-    console.log("PWA: iconos de color sólido (añade public/logo.png para usar tu marca).");
-  } else if (!fs.existsSync(logoPath)) {
-    console.log("public/icons/: sin cambios (ya existían iconos y no hay logo.png).");
+    console.log("PWA: iconos de color sólido (añade logo-light-large.png o logo.png).");
+  } else {
+    console.log("public/icons/: sin cambios.");
   }
 }
 
