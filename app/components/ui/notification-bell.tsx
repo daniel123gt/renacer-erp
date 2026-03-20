@@ -14,7 +14,7 @@ import {
   type TipoNotificacion,
 } from "~/services/notificacionesService";
 import { isLikelyIOS, isStandaloneDisplayMode } from "~/lib/device";
-import { getFaviconPath } from "~/lib/erpBranding";
+import { showOsNotification } from "~/lib/native-notifications";
 
 const POLL_MS = 45_000;
 
@@ -88,6 +88,10 @@ export function NotificationBell() {
   const requestNativePermission = useCallback(async () => {
     if (typeof Notification === "undefined") return;
     try {
+      // En iOS PWA el SW debe estar listo antes de pedir permiso (recomendado WebKit).
+      if ("serviceWorker" in navigator) {
+        await navigator.serviceWorker.ready.catch(() => {});
+      }
       const res = await Notification.requestPermission();
       setNativePermission(res);
     } catch {
@@ -105,19 +109,10 @@ export function NotificationBell() {
     if (shownNativeIdsRef.current.has(latestUnread.id)) return;
 
     shownNativeIdsRef.current.add(latestUnread.id);
-    try {
-      // Se muestra solo una por refresh (la más reciente sin leer)
-      // Nota: algunos navegadores requieren HTTPS y permiso concedido.
-      // En iPhone/iPad suele funcionar como banner del sistema solo si la app está en pantalla de inicio (PWA), iOS 16.4+.
-      // eslint-disable-next-line no-new
-      new Notification(latestUnread.titulo, {
-        body: latestUnread.cuerpo,
-        icon: getFaviconPath(),
-        tag: `renacer-${latestUnread.id}`,
-      });
-    } catch {
-      // Si no se puede (por políticas del navegador), no rompemos la UI.
-    }
+    void showOsNotification(latestUnread.titulo, {
+      body: latestUnread.cuerpo,
+      tag: `renacer-${latestUnread.id}`,
+    });
   }, [items, nativePermission]);
 
   return (
@@ -169,7 +164,7 @@ export function NotificationBell() {
             )}
             <p className="text-xs text-gray-600">
               {iosDevice && standalonePwa
-                ? "Permite notificaciones para recibir avisos como en el resto de apps (banners de iOS)."
+                ? "Permite notificaciones. Con la app abierta, iOS a veces no muestra el banner arriba; revisa el Centro de notificaciones. Con la app cerrada hace falta Web Push (aún no configurado)."
                 : "Para ver alertas nativas del sistema (banners), permite notificaciones en tu navegador."}
             </p>
             <Button
