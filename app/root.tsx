@@ -18,7 +18,8 @@ import "./app.css";
 export const links: Route.LinksFunction = () => [
   { rel: "icon", type: "image/png", href: getFaviconPath() },
   { rel: "manifest", href: "/manifest.webmanifest" },
-  { rel: "apple-touch-icon", href: getFaviconPath() },
+  /** iPhone / iPad al “Añadir a pantalla de inicio”: Apple recomienda 180×180 PNG. */
+  { rel: "apple-touch-icon", href: "/icons/icon-180.png", sizes: "180x180" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",

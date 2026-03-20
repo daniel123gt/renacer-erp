@@ -1,0 +1,23 @@
+iOS (iPhone / iPad)
+• “Añadir a pantalla de inicio” usa apple-touch-icon (/icons/icon-180.png) y el manifest.
+• A partir de iOS 16.4, la PWA instalada también puede usar Web Push; el icono sale del manifest.
+• Si cambias icono.png, ejecuta npm run build (o npm run icons) y vuelve a añadir a inicio.
+
+---
+
+Por qué el icono en el ESCRITORIO no coincide con la BARRA DE TAREAS (Windows + Edge/Chrome)
+
+• La barra de tareas suele tomar el icono de la pestaña / favicon (tu icono.png) mientras
+  la app está abierta → se ve “bien”.
+
+• El acceso directo del ESCRITORIO se creó en el momento de “Instalar aplicación” y Windows
+  guarda una copia en caché. Si después cambiaste iconos en la web, el acceso directo puede
+  seguir mostrando el icono VIEJO (por ejemplo el logo horizontal antiguo).
+
+Qué hacer:
+1. Desinstala la app instalada (Edge/Chrome → Configuración de la app o clic derecho en el icono).
+2. Borra el acceso directo del escritorio si quedó huérfano.
+3. Vuelve a instalar desde el navegador (Menú → Instalar Renacer ERP / Aplicación).
+
+Tras un deploy nuevo, a veces hace falta repetir eso una vez para que Windows actualice el .ico
+del acceso directo.
