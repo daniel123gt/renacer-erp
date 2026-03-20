@@ -124,18 +124,6 @@ export default function PromesasPage() {
     return Object.entries(weeks).map(([semana, total]) => ({ semana, total }));
   }, [promesas]);
 
-  const chartPorPersona = useMemo(() => {
-    const map: Record<string, number> = {};
-    promesas.forEach((t) => {
-      const name = t.persona || "Anónimo";
-      map[name] = (map[name] ?? 0) + t.monto;
-    });
-    return Object.entries(map)
-      .map(([nombre, total]) => ({ nombre, total }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10);
-  }, [promesas]);
-
   const chartPorMetodo = useMemo(() => {
     const map: Record<string, number> = {};
     promesas.forEach((t) => {
@@ -317,29 +305,6 @@ export default function PromesasPage() {
                         <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `S/${v}`} />
                         <Tooltip formatter={(v: number) => [`S/${formatMoney(v)}`, "Total"]} />
                         <Bar dataKey="total" fill="#7c3aed" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-semibold text-gray-700">Top contribuyentes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {chartPorPersona.length === 0 ? (
-                  <p className="text-gray-400 text-sm text-center py-8">Sin datos</p>
-                ) : (
-                  <div className="h-[220px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartPorPersona} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
-                        <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `S/${v}`} />
-                        <YAxis type="category" dataKey="nombre" width={80} tick={{ fontSize: 11 }} />
-                        <Tooltip formatter={(v: number) => [`S/${formatMoney(v)}`, "Total"]} />
-                        <Bar dataKey="total" fill="#c4b5fd" radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>

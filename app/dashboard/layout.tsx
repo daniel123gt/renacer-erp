@@ -25,16 +25,23 @@ function MobileMenuButton() {
   );
 }
 
+const SESSION_CHECK_TIMEOUT_MS = 30_000;
+
 export default function Layout() {
   const { user, hasHydrated, logout: logoutUser, login } = useAuthStore();
   const navigate = useNavigate();
   const [checkingSession, setCheckingSession] = useState(true);
 
+  // Importante: depender de user?.id, no de `user` entero. Cada login() sustituye el
+  // objeto en el store; si el efecto depende de `user`, se re-ejecuta en bucle, el cleanup
+  // marca alive=false y el finally de la validación anterior no hace setCheckingSession(false).
+  const userId = user?.id;
+
   // Los hooks deben ejecutarse siempre en el mismo orden (nunca después de un return condicional).
   useEffect(() => {
     if (!hasHydrated) return;
 
-    if (!user) {
+    if (!userId) {
       setCheckingSession(false);
       return;
     }
@@ -53,6 +60,14 @@ export default function Layout() {
       };
     };
 
+    const timeoutId = window.setTimeout(() => {
+      if (!alive) return;
+      alive = false;
+      logoutUser();
+      navigate("/login");
+      setCheckingSession(false);
+    }, SESSION_CHECK_TIMEOUT_MS);
+
     const validateSession = async () => {
       try {
         const {
@@ -68,7 +83,6 @@ export default function Layout() {
           return;
         }
 
-        // Refresca el usuario en el store (por si el metadata cambió).
         const { data: authData, error: userErr } = await supabase.auth.getUser();
         if (userErr) throw userErr;
         const appUser = mapToAppUser(authData?.user);
@@ -84,8 +98,8 @@ export default function Layout() {
         logoutUser();
         navigate("/login");
       } finally {
-        if (!alive) return;
-        setCheckingSession(false);
+        window.clearTimeout(timeoutId);
+        if (alive) setCheckingSession(false);
       }
     };
 
@@ -95,7 +109,7 @@ export default function Layout() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
       if (!alive) return;
-      if (event === "SIGNED_OUT" || event === "TOKEN_REFRESH_FAILED") {
+      if (event === "SIGNED_OUT") {
         logoutUser();
         navigate("/login");
       }
@@ -103,9 +117,10 @@ export default function Layout() {
 
     return () => {
       alive = false;
+      window.clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, [hasHydrated, user, login, logoutUser, navigate]);
+  }, [hasHydrated, userId, login, logoutUser, navigate]);
 
   if (!hasHydrated) {
     return <FullPageLoader label="Preparando sesión…" />;
