@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, Building2, Cake, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -26,6 +26,11 @@ export function NotificationBell() {
   const [items, setItems] = useState<NotificacionConEstado[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [nativePermission, setNativePermission] = useState<NotificationPermission>(() => {
+    if (typeof Notification === "undefined") return "default";
+    return Notification.permission;
+  });
+  const shownNativeIdsRef = useRef<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
     try {
@@ -71,6 +76,36 @@ export function NotificationBell() {
     }
   };
 
+  const requestNativePermission = useCallback(async () => {
+    if (typeof Notification === "undefined") return;
+    try {
+      const res = await Notification.requestPermission();
+      setNativePermission(res);
+    } catch {
+      // Si el navegador no soporta la API, simplemente no mostramos notificación nativa
+    }
+  }, []);
+
+  // Cuando la app está abierta y llega una notificación nueva sin leer,
+  // mostramos una notificación nativa del sistema (sin Web Push).
+  useEffect(() => {
+    if (typeof Notification === "undefined") return;
+    if (nativePermission !== "granted") return;
+    const latestUnread = items.find((n) => !n.leida);
+    if (!latestUnread) return;
+    if (shownNativeIdsRef.current.has(latestUnread.id)) return;
+
+    shownNativeIdsRef.current.add(latestUnread.id);
+    try {
+      // Se muestra solo una por refresh (la más reciente sin leer)
+      // Nota: algunos navegadores requieren HTTPS y permiso concedido.
+      // eslint-disable-next-line no-new
+      new Notification(latestUnread.titulo, { body: latestUnread.cuerpo });
+    } catch {
+      // Si no se puede (por políticas del navegador), no rompemos la UI.
+    }
+  }, [items, nativePermission]);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -105,6 +140,24 @@ export function NotificationBell() {
             </Button>
           )}
         </div>
+
+        {nativePermission !== "granted" && (
+          <div className="px-3 py-2 border-b border-gray-100">
+            <p className="text-xs text-gray-600 mb-2">
+              Para ver alertas nativas del sistema, permite notificaciones en tu navegador.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-full"
+              onClick={() => void requestNativePermission()}
+            >
+              Activar notificaciones nativas
+            </Button>
+          </div>
+        )}
+
         <div className="max-h-[min(70vh,360px)] overflow-y-auto">
           {loading ? (
             <div className="flex justify-center py-10">

@@ -1,8 +1,12 @@
 /**
  * Cron recomendado (UTC): 0 * * * *  (cada hora en punto)
- * Solo actúa si en America/Lima es jueves (ISODOW 4) y hora local >= 16,
- * y el saldo del mes es menor que app_config.cuota_alquiler.
- * dedupe_key por hora lima evita duplicados en la misma hora.
+ *
+ * Regla horaria (Lima):
+ * - Si es lunes/martes/miércoles: no se envía.
+ * - Si es jueves: solo desde las 16:00 en adelante.
+ * - Si es viernes/sábado/domingo: se envía todo el día.
+ *
+ * Cuando saldo del mes < app_config.cuota_alquiler -> crea notificación (1 por hora).
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 
@@ -31,15 +35,17 @@ Deno.serve(async (req) => {
     const d = row.d as number;
     const isodow = row.isodow as number;
     const hr = row.hr as number;
-    const mi = typeof row.mi === "number" ? row.mi : 0;
 
-    if (isodow !== 4 || hr < 16) {
+    const isThu = isodow === 4;
+    const isAfterThu = isodow >= 4; // jueves=4, viernes=5, ...
+
+    if (!isAfterThu || (isThu && hr < 16)) {
       return new Response(
         JSON.stringify({
           ok: true,
           skipped: true,
-          reason: "Solo jueves desde las 16:00 (Lima)",
-          lima: { isodow, hr, mi },
+          reason: "Aún no corresponde enviar la alerta de alquiler",
+          lima: { isodow, hr },
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
