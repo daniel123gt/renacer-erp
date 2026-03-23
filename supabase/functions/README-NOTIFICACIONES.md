@@ -19,7 +19,7 @@ En **Project Settings → Edge Functions → Schedules** (o **Integrations → C
 | Función             | Expresión cron (UTC) | Efecto aproximado (Lima, UTC-5)        |
 |---------------------|----------------------|----------------------------------------|
 | `notify-birthdays`  | `0 11 * * *`         | Todos los días **06:00** hora Lima     |
-| `notify-rent-alert` | `0 * * * *`          | Cada hora en punto UTC; la función crea notificación si en Lima es **jueves desde las 16:00** o **viernes/sábado/domingo** y el saldo del mes &lt; cuota. |
+| `notify-rent-alert` | `0 * * * *`          | La función corre cada hora pero **solo envía** en franjas Lima: jueves **20:00**, viernes/sábado/domingo **06:00 y 20:00**, si saldo del mes &lt; cuota. |
 
 > Perú no usa horario de verano; 11:00 UTC = 06:00 Lima de forma estable.
 
@@ -27,6 +27,15 @@ En **Project Settings → Edge Functions → Schedules** (o **Integrations → C
 
 - `verify_jwt = false` en `config.toml` para estas funciones: están pensadas para invocación solo por **cron interno de Supabase** (o llamadas con `service_role` en entorno controlado).
 - No publiques la URL de la función ni la uses desde el navegador sin protección adicional si te preocupa el abuso (puedes añadir un header secreto comprobado en el código).
+
+## Email con Resend (opcional, recomendado)
+
+Si defines estos secrets en Supabase, además de la notificación interna se enviará email automático a los usuarios con correo confirmado:
+
+- `RESEND_API_KEY`
+- `RESEND_FROM` (ej. `alertas@tu-dominio.com`)
+
+Se registra deduplicación por destinatario en `email_logs` con `dedupe_key`.
 
 ## Datos
 
