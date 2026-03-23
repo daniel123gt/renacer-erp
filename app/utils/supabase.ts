@@ -1,15 +1,32 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+/**
+ * En Vercel, el SSR a veces necesita leer `process.env` en runtime; en el cliente Vite
+ * incrusta `import.meta.env.VITE_*` en build (debe ser acceso estático, no dinámico).
+ */
+function supabaseUrlFromEnv(): string {
+  if (typeof process !== "undefined" && process.env.VITE_SUPABASE_URL) {
+    return process.env.VITE_SUPABASE_URL;
+  }
+  return import.meta.env.VITE_SUPABASE_URL || "";
+}
 
-// Validación de variables de entorno
+function supabaseAnonKeyFromEnv(): string {
+  if (typeof process !== "undefined" && process.env.VITE_SUPABASE_ANON_KEY) {
+    return process.env.VITE_SUPABASE_ANON_KEY;
+  }
+  return import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+}
+
+const supabaseUrl = supabaseUrlFromEnv();
+const supabaseKey = supabaseAnonKeyFromEnv();
+
 if (!supabaseUrl) {
-  throw new Error('VITE_SUPABASE_URL no está definida en las variables de entorno');
+  throw new Error("VITE_SUPABASE_URL no está definida en las variables de entorno");
 }
 
 if (!supabaseKey) {
-  throw new Error('VITE_SUPABASE_ANON_KEY no está definida en las variables de entorno');
+  throw new Error("VITE_SUPABASE_ANON_KEY no está definida en las variables de entorno");
 }
 
 /**
