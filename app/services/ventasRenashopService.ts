@@ -297,12 +297,25 @@ export const ventasRenashopService = {
     return full;
   },
 
+  /**
+   * Elimina el ticket y repone inventario: las unidades descontadas al vender
+   * (líneas con `producto_id`) vuelven a sumarse en `materials.stock`.
+   * Las líneas sin producto (texto libre) no mueven stock.
+   */
   async eliminar(id: string): Promise<void> {
-    const prev = await this.getById(id);
-    if (!prev) throw new Error("Venta no encontrada");
-    const lineasStock = prev.lineas.map((l) => ({
-      producto_id: l.producto_id,
-      cantidad: l.cantidad,
+    const { data: cabRow, error: cabErr } = await supabase.from(CAB).select("id").eq("id", id).maybeSingle();
+    if (cabErr) throw cabErr;
+    if (!cabRow) throw new Error("Venta no encontrada");
+
+    const { data: lineRows, error: linErr } = await supabase
+      .from(LIN)
+      .select("producto_id, cantidad")
+      .eq("venta_id", id);
+    if (linErr) throw linErr;
+
+    const lineasStock = (lineRows ?? []).map((r: { producto_id: string | null; cantidad: number }) => ({
+      producto_id: r.producto_id ?? null,
+      cantidad: Number(r.cantidad),
     }));
 
     await applyRenashopStockDelta(lineasStock, []);
