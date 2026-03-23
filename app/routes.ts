@@ -2,6 +2,7 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
 export default [
   route("login", "routes/auth.tsx"),
+  route("configurar-contrasena", "routes/setup-password.tsx"),
   route('/', 'routes/dashboard.tsx', [
     index('routes/home.tsx'),
     route('finanzas', 'routes/finanzas.tsx'),

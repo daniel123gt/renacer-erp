@@ -32,3 +32,34 @@ export const logout = async () => {
     return { success: true };
   }
 };
+
+export const getCurrentSessionUser = async () => {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) return { user: null, error };
+  return { user: data.session?.user ?? null, error: null };
+};
+
+export const setPasswordForInvitedUser = async (
+  email: string,
+  password: string
+) => {
+  const { user, error } = await getCurrentSessionUser();
+  if (error) return { data: null, error };
+  if (!user?.email) {
+    return {
+      data: null,
+      error: { message: "No hay una sesión de invitación activa." },
+    };
+  }
+  if (user.email.toLowerCase() !== email.trim().toLowerCase()) {
+    return {
+      data: null,
+      error: {
+        message:
+          "El correo no coincide con la invitación. Usa el mismo correo del enlace recibido.",
+      },
+    };
+  }
+  const { data, error: updateErr } = await supabase.auth.updateUser({ password });
+  return { data, error: updateErr };
+};
