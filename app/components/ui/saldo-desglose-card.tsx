@@ -46,7 +46,7 @@ export function SaldoDesgloseCard({ balance, formatMoney, variant = "default" }:
           <div className="min-w-0 flex-1 space-y-4">
             {block("Saldo actual", saldoActual, colorActual)}
             <div className={`border-t ${divider} pt-4`}>
-              {block("Saldo Renashop", capitalRenashop, colorRenashop)}
+              {block("Capital Renashop", capitalRenashop, colorRenashop)}
             </div>
             <div className={`border-t ${divider} pt-4`}>
               {block("Saldo total", saldoTotal, colorTotal)}
