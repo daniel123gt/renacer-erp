@@ -2,6 +2,12 @@ import supabase from "~/utils/supabase";
 
 export type EstadoActividad = "pendiente" | "activa" | "completada" | "cancelada";
 
+/** Ítem de costo de insumos en una actividad */
+export interface ActividadInsumo {
+  nombre: string;
+  costo: number;
+}
+
 export interface Actividad {
   id: string;
   nombre: string;
@@ -10,6 +16,8 @@ export interface Actividad {
   meta_cantidad: number;
   precio_unitario: number;
   costo_total: number;
+  /** Detalle de insumos (suma debe coincidir con costo_total al guardar) */
+  insumos: ActividadInsumo[];
   fecha_inicio: string | null;
   fecha_fin: string | null;
   estado: EstadoActividad;
@@ -27,10 +35,27 @@ export interface ActividadInput {
   meta_cantidad: number;
   precio_unitario: number;
   costo_total?: number;
+  insumos?: ActividadInsumo[];
   fecha_inicio?: string | null;
   fecha_fin?: string | null;
   estado?: EstadoActividad;
   notas?: string | null;
+}
+
+function parseInsumosFromRow(raw: unknown): ActividadInsumo[] {
+  if (!raw || !Array.isArray(raw)) return [];
+  return raw
+    .filter((x) => x && typeof x === "object")
+    .map((x: any) => ({
+      nombre: String(x.nombre ?? "").trim(),
+      costo: Math.max(0, Number(x.costo) || 0),
+    }))
+    .filter((x) => x.costo > 0 && x.nombre.length > 0);
+}
+
+/** Suma de costos de la lista de insumos */
+export function sumarCostoInsumos(items: ActividadInsumo[]): number {
+  return items.reduce((s, i) => s + (Number(i.costo) || 0), 0);
 }
 
 export interface ActividadVenta {
@@ -62,6 +87,7 @@ export interface ActividadVentaInput {
 }
 
 function mapActividad(r: any): Actividad {
+  const insumos = parseInsumosFromRow(r.insumos);
   return {
     id: r.id,
     nombre: r.nombre,
@@ -70,12 +96,23 @@ function mapActividad(r: any): Actividad {
     meta_cantidad: Number(r.meta_cantidad),
     precio_unitario: Number(r.precio_unitario),
     costo_total: Number(r.costo_total ?? 0),
+    insumos,
     fecha_inicio: r.fecha_inicio ?? null,
     fecha_fin: r.fecha_fin ?? null,
     estado: r.estado as EstadoActividad,
     notas: r.notas ?? null,
     created_at: r.created_at,
   };
+}
+
+function normalizeInsumosForDb(items: ActividadInsumo[] | undefined): ActividadInsumo[] {
+  if (!items?.length) return [];
+  return items
+    .map((i) => ({
+      nombre: i.nombre.trim(),
+      costo: Math.max(0, Number(i.costo) || 0),
+    }))
+    .filter((i) => i.nombre.length > 0 && i.costo > 0);
 }
 
 function mapVenta(r: any): ActividadVenta {
@@ -150,6 +187,8 @@ export const actividadesService = {
 
   async crear(input: ActividadInput): Promise<Actividad> {
     const { data: userData } = await supabase.auth.getUser();
+    const insumosDb = normalizeInsumosForDb(input.insumos);
+    const costo_total = sumarCostoInsumos(insumosDb);
     const { data, error } = await supabase
       .from("actividades")
       .insert({
@@ -158,7 +197,8 @@ export const actividadesService = {
         proposito: input.proposito?.trim() || null,
         meta_cantidad: input.meta_cantidad,
         precio_unitario: input.precio_unitario,
-        costo_total: input.costo_total ?? 0,
+        costo_total,
+        insumos: insumosDb,
         fecha_inicio: input.fecha_inicio || null,
         fecha_fin: input.fecha_fin || null,
         estado: input.estado || "pendiente",
@@ -178,7 +218,13 @@ export const actividadesService = {
     if (input.proposito !== undefined) updateData.proposito = input.proposito?.trim() || null;
     if (input.meta_cantidad !== undefined) updateData.meta_cantidad = input.meta_cantidad;
     if (input.precio_unitario !== undefined) updateData.precio_unitario = input.precio_unitario;
-    if (input.costo_total !== undefined) updateData.costo_total = input.costo_total;
+    if (input.insumos !== undefined) {
+      const insumosDb = normalizeInsumosForDb(input.insumos);
+      updateData.insumos = insumosDb;
+      updateData.costo_total = sumarCostoInsumos(insumosDb);
+    } else if (input.costo_total !== undefined) {
+      updateData.costo_total = input.costo_total;
+    }
     if (input.fecha_inicio !== undefined) updateData.fecha_inicio = input.fecha_inicio || null;
     if (input.fecha_fin !== undefined) updateData.fecha_fin = input.fecha_fin || null;
     if (input.estado !== undefined) updateData.estado = input.estado;

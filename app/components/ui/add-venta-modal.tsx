@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -15,15 +15,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Combobox, type ComboboxOption } from "~/components/ui/combobox";
+import { Combobox } from "~/components/ui/combobox";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Minus, Plus, Trash2, Package } from "lucide-react";
 import {
   ventasRenashopService,
   type VentaRenashop,
-  type VentaInput,
+  type EstadoPagoVenta,
 } from "~/services/ventasRenashopService";
 import { inventoryService, type InventoryItem } from "~/services/inventoryService";
+import { cn } from "~/lib/utils";
 
 interface Props {
   open: boolean;
@@ -39,17 +40,42 @@ const METODOS_PAGO = [
   { value: "otro", label: "Otro" },
 ];
 
+const ESTADOS_PAGO: { value: EstadoPagoVenta; label: string }[] = [
+  { value: "pagado", label: "Pagado" },
+  { value: "pendiente", label: "Pendiente de pago" },
+];
+
+type CartLine = {
+  lineId: string;
+  producto_id: string | null;
+  producto_nombre: string;
+  cantidad: number;
+  costo_unitario: number;
+  precio_unitario: number;
+  imageUrl?: string;
+};
+
+function newLineFromProduct(p: InventoryItem): CartLine {
+  return {
+    lineId: crypto.randomUUID(),
+    producto_id: p.id,
+    producto_nombre: p.name,
+    cantidad: 1,
+    costo_unitario: p.price,
+    precio_unitario: p.salePrice,
+    imageUrl: p.imageUrl,
+  };
+}
+
 export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props) {
   const [productos, setProductos] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [fecha, setFecha] = useState(() => new Date().toISOString().split("T")[0]);
-  const [productoId, setProductoId] = useState("");
-  const [productoNombre, setProductoNombre] = useState("");
-  const [cantidad, setCantidad] = useState("1");
-  const [costoUnitario, setCostoUnitario] = useState("");
-  const [precioUnitario, setPrecioUnitario] = useState("");
-  const [metodoPago, setMetodoPago] = useState("efectivo");
+  const [metodoPago, setMetodoPago] = useState("plin");
+  const [estadoPago, setEstadoPago] = useState<EstadoPagoVenta>("pagado");
   const [notas, setNotas] = useState("");
+  const [cart, setCart] = useState<CartLine[]>([]);
+  const [pickerValue, setPickerValue] = useState("");
 
   const isEditing = !!editData;
 
@@ -58,84 +84,141 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
       inventoryService.list().then(setProductos).catch(() => {});
       if (editData) {
         setFecha(editData.fecha);
-        setProductoId(editData.producto_id ?? "manual");
-        setProductoNombre(editData.producto_nombre);
-        setCantidad(String(editData.cantidad));
-        setCostoUnitario(String(editData.costo_unitario));
-        setPrecioUnitario(String(editData.precio_unitario));
-        setMetodoPago(editData.metodo_pago ?? "efectivo");
+        setMetodoPago(editData.metodo_pago ?? "plin");
+        setEstadoPago(editData.estado_pago === "pendiente" ? "pendiente" : "pagado");
         setNotas(editData.notas ?? "");
+        setCart(
+          (editData.lineas ?? []).map((l) => ({
+            lineId: l.id,
+            producto_id: l.producto_id,
+            producto_nombre: l.producto_nombre,
+            cantidad: l.cantidad,
+            costo_unitario: l.costo_unitario,
+            precio_unitario: l.precio_unitario,
+            imageUrl: undefined,
+          }))
+        );
       } else {
         setFecha(new Date().toISOString().split("T")[0]);
-        setProductoId("");
-        setProductoNombre("");
-        setCantidad("1");
-        setCostoUnitario("");
-        setPrecioUnitario("");
-        setMetodoPago("efectivo");
+        setMetodoPago("plin");
+        setEstadoPago("pagado");
         setNotas("");
+        setCart([]);
       }
+      setPickerValue("");
     }
   }, [open, editData]);
 
-  const handleProductoChange = (value: string) => {
-    setProductoId(value);
-    if (value === "manual") {
-      setProductoNombre("");
-      setCostoUnitario("");
-      setPrecioUnitario("");
-      return;
-    }
+  useEffect(() => {
+    if (!open || productos.length === 0) return;
+    setCart((prev) =>
+      prev.map((line) => {
+        if (!line.producto_id || line.imageUrl) return line;
+        const p = productos.find((x) => x.id === line.producto_id);
+        return p?.imageUrl ? { ...line, imageUrl: p.imageUrl } : line;
+      })
+    );
+  }, [open, productos, editData?.id]);
+
+  const comboboxOptions = useMemo(
+    () =>
+      productos.map((p) => ({
+        value: p.id,
+        label: `${p.name} — S/ ${p.salePrice.toFixed(2)} (${p.currentStock} disp.)`,
+        imageUrl: p.imageUrl,
+      })),
+    [productos]
+  );
+
+  const handlePickerChange = (value: string) => {
+    setPickerValue("");
     const prod = productos.find((p) => p.id === value);
-    if (prod) {
-      setProductoNombre(prod.name);
-      setCostoUnitario(String(prod.price));
-      setPrecioUnitario(String(prod.salePrice));
-    }
+    if (!prod) return;
+    setCart((prev) => {
+      const idx = prev.findIndex((l) => l.producto_id === prod.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], cantidad: next[idx].cantidad + 1 };
+        return next;
+      }
+      return [...prev, newLineFromProduct(prod)];
+    });
+    toast.success(`${prod.name} añadido`);
   };
 
-  const cant = Number(cantidad) || 0;
-  const costo = Number(costoUnitario) || 0;
-  const precio = Number(precioUnitario) || 0;
-  const total = cant * precio;
-  const gananciaTotal = cant * (precio - costo);
+  const updateLine = (lineId: string, patch: Partial<CartLine>) => {
+    setCart((prev) => prev.map((l) => (l.lineId === lineId ? { ...l, ...patch } : l)));
+  };
+
+  const bumpQty = (lineId: string, delta: number) => {
+    setCart((prev) =>
+      prev.map((l) => {
+        if (l.lineId !== lineId) return l;
+        const next = Math.max(1, l.cantidad + delta);
+        return { ...l, cantidad: next };
+      })
+    );
+  };
+
+  const removeLine = (lineId: string) => {
+    setCart((prev) => prev.filter((l) => l.lineId !== lineId));
+  };
+
+  const totalCarrito = useMemo(
+    () => cart.reduce((s, l) => s + l.cantidad * l.precio_unitario, 0),
+    [cart]
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productoNombre.trim()) {
-      toast.error("El nombre del producto es obligatorio");
+    if (cart.length === 0) {
+      toast.error("Añade al menos un producto");
       return;
     }
-    const cantVal = parseInt(cantidad);
-    if (isNaN(cantVal) || cantVal <= 0) {
-      toast.error("La cantidad debe ser mayor a 0");
-      return;
+    for (const line of cart) {
+      if (!line.producto_nombre.trim()) {
+        toast.error("Hay una línea sin nombre de producto");
+        return;
+      }
+      if (line.precio_unitario <= 0) {
+        toast.error(`Precio inválido en: ${line.producto_nombre}`);
+        return;
+      }
+      if (line.cantidad < 1) {
+        toast.error("La cantidad debe ser al menos 1");
+        return;
+      }
     }
-    const precioVal = parseFloat(precioUnitario);
-    if (isNaN(precioVal) || precioVal <= 0) {
-      toast.error("El precio de venta debe ser mayor a 0");
-      return;
+    if (!isEditing) {
+      for (const line of cart) {
+        if (!line.producto_id) {
+          toast.error("Solo se pueden registrar productos del inventario");
+          return;
+        }
+      }
     }
-    const costoVal = parseFloat(costoUnitario) || 0;
+
+    const lineasPayload = cart.map((l) => ({
+      producto_id: l.producto_id,
+      producto_nombre: l.producto_nombre.trim(),
+      cantidad: l.cantidad,
+      costo_unitario: l.costo_unitario,
+      precio_unitario: l.precio_unitario,
+    }));
+    const cabecera = {
+      fecha,
+      metodo_pago: metodoPago || "plin",
+      estado_pago: estadoPago,
+      notas: notas.trim() || undefined,
+    };
 
     setLoading(true);
     try {
-      const input: VentaInput = {
-        fecha,
-        producto_id: productoId && productoId !== "manual" ? productoId : null,
-        producto_nombre: productoNombre.trim(),
-        cantidad: cantVal,
-        costo_unitario: costoVal,
-        precio_unitario: precioVal,
-        metodo_pago: metodoPago || "efectivo",
-        notas: notas.trim() || undefined,
-      };
-
       if (isEditing && editData) {
-        await ventasRenashopService.actualizar(editData.id, input);
+        await ventasRenashopService.actualizarVenta(editData.id, cabecera, lineasPayload);
         toast.success("Venta actualizada");
       } else {
-        await ventasRenashopService.crear(input);
+        await ventasRenashopService.crearVenta(lineasPayload, cabecera);
         toast.success("Venta registrada");
       }
       onSuccess();
@@ -149,15 +232,27 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent
+        className={cn(
+          "w-[95vw] max-w-[95vw] max-h-[92vh] overflow-y-auto sm:max-w-[min(96vw,720px)]",
+          "top-[50%] translate-y-[-50%] p-4 sm:p-6"
+        )}
+      >
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Editar venta" : "Registrar venta"}</DialogTitle>
+          <DialogTitle className="text-xl">
+            {isEditing ? "Editar venta" : "Registrar venta"}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <Label>Fecha</Label>
-              <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
+              <Input
+                type="date"
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+                required
+              />
             </div>
             <div>
               <Label>Método de pago</Label>
@@ -167,7 +262,27 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
                 </SelectTrigger>
                 <SelectContent>
                   {METODOS_PAGO.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Estado del pago</Label>
+              <Select
+                value={estadoPago}
+                onValueChange={(v) => setEstadoPago(v as EstadoPagoVenta)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ESTADOS_PAGO.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -175,65 +290,132 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
           </div>
 
           <div>
-            <Label>Producto</Label>
+            <Label>Buscar y añadir producto</Label>
             <Combobox
-              value={productoId}
-              onValueChange={handleProductoChange}
-              placeholder="Buscar producto..."
+              key={`picker-${open}-${editData?.id ?? "n"}`}
+              value={pickerValue}
+              onValueChange={handlePickerChange}
+              placeholder="Buscar producto del inventario…"
               emptySearchText="No se encontró el producto"
-              emptyOption={{ value: "manual", label: "✏️ Escribir manualmente" }}
-              options={productos.map((p) => ({
-                value: p.id,
-                label: `${p.name} — S/ ${p.salePrice.toFixed(2)} (${p.currentStock} disp.)`,
-                imageUrl: p.imageUrl,
-              }))}
+              options={comboboxOptions}
             />
           </div>
 
-          {productoId === "manual" && (
-            <div>
-              <Label>Nombre del producto</Label>
-              <Input
-                placeholder="Ej: Gaseosa, Galletas..."
-                value={productoNombre}
-                onChange={(e) => setProductoNombre(e.target.value)}
-                required
-              />
+          <div>
+            <Label className="mb-2 block">
+              {isEditing ? "Producto" : "Carrito"} ({cart.length})
+            </Label>
+            {cart.length === 0 ? (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 py-12 text-center text-sm text-muted-foreground">
+                Busca en el inventario y añade productos al carrito
+              </div>
+            ) : (
+              <ul className="space-y-2 max-h-[min(40vh,320px)] overflow-y-auto pr-1">
+                {cart.map((line) => {
+                  const sub = line.cantidad * line.precio_unitario;
+                  return (
+                    <li
+                      key={line.lineId}
+                      className="flex gap-3 items-center rounded-lg border bg-white p-2 shadow-sm"
+                    >
+                      <div className="h-14 w-14 shrink-0 rounded-md bg-gray-100 overflow-hidden flex items-center justify-center border">
+                        {line.imageUrl ? (
+                          <img
+                            src={line.imageUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <Package className="h-7 w-7 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        {isEditing && !line.producto_id ? (
+                          <Input
+                            className="h-8 text-sm font-medium"
+                            value={line.producto_nombre}
+                            onChange={(e) =>
+                              updateLine(line.lineId, { producto_nombre: e.target.value })
+                            }
+                            required
+                          />
+                        ) : (
+                          <p className="font-medium text-sm truncate">{line.producto_nombre}</p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-1 border rounded-md">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              disabled={line.cantidad <= 1}
+                              onClick={() => bumpQty(line.lineId, -1)}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-8 text-center text-sm font-semibold tabular-nums">
+                              {line.cantidad}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() => bumpQty(line.lineId, 1)}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <span>P. unit.</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="h-8 w-24 text-right"
+                              value={line.precio_unitario}
+                              onChange={(e) =>
+                                updateLine(line.lineId, {
+                                  precio_unitario: parseFloat(e.target.value) || 0,
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                        <p className="font-semibold text-amber-700 tabular-nums">
+                          S/ {sub.toFixed(2)}
+                        </p>
+                        {(!isEditing || cart.length > 1) && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500 hover:text-red-700"
+                            onClick={() => removeLine(line.lineId)}
+                            aria-label="Quitar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          {cart.length > 0 && (
+            <div className="flex justify-between items-center rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
+              <span className="font-semibold text-amber-900">Total</span>
+              <span className="text-xl font-bold text-amber-800 tabular-nums">
+                S/ {totalCarrito.toFixed(2)}
+              </span>
             </div>
           )}
-
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label>Cantidad</Label>
-              <Input
-                type="number"
-                min="1"
-                value={cantidad}
-                onChange={(e) => setCantidad(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label>Precio unit. (S/)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={precioUnitario}
-                onChange={(e) => setPrecioUnitario(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label>Total (S/)</Label>
-              <Input
-                value={`S/ ${total.toFixed(2)}`}
-                disabled
-                className="bg-gray-50 font-semibold"
-              />
-            </div>
-          </div>
 
           <div>
             <Label>Notas (opcional)</Label>
@@ -244,7 +426,7 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-2 border-t">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>

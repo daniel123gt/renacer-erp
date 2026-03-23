@@ -27,7 +27,11 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { ventasRenashopService, type VentaRenashop } from "~/services/ventasRenashopService";
+import {
+  ventasRenashopService,
+  type VentaRenashop,
+  totalVenta,
+} from "~/services/ventasRenashopService";
 import { inventoryService, type InventoryItem } from "~/services/inventoryService";
 
 const PIE_COLORS = ["#f59e0b", "#2a4945", "#abd9cd", "#ef4444", "#6366f1", "#ec4899", "#14b8a6", "#d8dfd6"];
@@ -61,7 +65,7 @@ export default function RenashopPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const totalMes = ventas.reduce((s, v) => s + v.total, 0);
+  const totalMes = ventas.reduce((s, v) => s + totalVenta(v), 0);
   const cantidadMes = ventas.length;
 
   const totalProductos = inventory.length;
@@ -72,10 +76,12 @@ export default function RenashopPage() {
   const topProductos = useMemo(() => {
     const map: Record<string, { nombre: string; total: number; cantidad: number }> = {};
     ventas.forEach((v) => {
-      const key = v.producto_nombre;
-      if (!map[key]) map[key] = { nombre: key, total: 0, cantidad: 0 };
-      map[key].total += v.total;
-      map[key].cantidad += v.cantidad;
+      v.lineas.forEach((l) => {
+        const key = l.producto_nombre;
+        if (!map[key]) map[key] = { nombre: key, total: 0, cantidad: 0 };
+        map[key].total += l.total;
+        map[key].cantidad += l.cantidad;
+      });
     });
     return Object.values(map).sort((a, b) => b.total - a.total).slice(0, 8);
   }, [ventas]);
@@ -85,7 +91,7 @@ export default function RenashopPage() {
     ventas.forEach((v) => {
       const day = new Date(v.fecha + "T12:00:00");
       const dayName = day.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" });
-      map[dayName] = (map[dayName] ?? 0) + v.total;
+      map[dayName] = (map[dayName] ?? 0) + totalVenta(v);
     });
     return Object.entries(map)
       .map(([dia, total]) => ({ dia, total }))

@@ -83,11 +83,13 @@ export default function ReportesRenashopPage() {
   const productReports = useMemo<ProductReport[]>(() => {
     const map: Record<string, { nombre: string; cantidad: number; ingresos: number; costo: number }> = {};
     ventas.forEach((v) => {
-      const key = v.producto_nombre;
-      if (!map[key]) map[key] = { nombre: key, cantidad: 0, ingresos: 0, costo: 0 };
-      map[key].cantidad += v.cantidad;
-      map[key].ingresos += v.total;
-      map[key].costo += v.costo_unitario * v.cantidad;
+      v.lineas.forEach((l) => {
+        const key = l.producto_nombre;
+        if (!map[key]) map[key] = { nombre: key, cantidad: 0, ingresos: 0, costo: 0 };
+        map[key].cantidad += l.cantidad;
+        map[key].ingresos += l.total;
+        map[key].costo += l.costo_unitario * l.cantidad;
+      });
     });
     return Object.values(map)
       .map((p) => ({
@@ -110,8 +112,10 @@ export default function ReportesRenashopPage() {
       const day = new Date(v.fecha + "T12:00:00");
       const dayLabel = day.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
       if (!map[dayLabel]) map[dayLabel] = { dia: dayLabel, ingresos: 0, costo: 0, ganancia: 0 };
-      map[dayLabel].ingresos += v.total;
-      map[dayLabel].costo += v.costo_unitario * v.cantidad;
+      v.lineas.forEach((l) => {
+        map[dayLabel].ingresos += l.total;
+        map[dayLabel].costo += l.costo_unitario * l.cantidad;
+      });
     });
     return Object.values(map).map((d) => ({
       ...d,
@@ -143,8 +147,10 @@ export default function ReportesRenashopPage() {
     ventas.forEach((v) => {
       const vMonth = parseInt(v.fecha.split("-")[1], 10);
       if (vMonth >= 1 && vMonth <= 12) {
-        meses[vMonth - 1].ingresos += v.total;
-        meses[vMonth - 1].costo += v.costo_unitario * v.cantidad;
+        v.lineas.forEach((l) => {
+          meses[vMonth - 1].ingresos += l.total;
+          meses[vMonth - 1].costo += l.costo_unitario * l.cantidad;
+        });
       }
     });
     meses.forEach((m) => { m.ganancia = m.ingresos - m.costo; });

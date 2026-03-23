@@ -3,14 +3,16 @@ LOGOS DEL ERP
   icono.png
     → Favicon (pestaña del navegador), apple-touch-icon y base para los PNG
       public/icons/icon-192.png / icon-512.png al hacer npm run build (icono al instalar la app).
+      Sustituye este archivo cuando mejores la calidad del icono; luego vuelve a hacer build.
 
-  logo-light-large.png
-    → Menú lateral y login. Si existe, el icono al INSTALAR LA APP (PWA) se genera
-      desde este archivo (versión clara, con fondo blanco en el icono del sistema).
+  logo-light.png
+    → Menú lateral y pantalla de login (app/erp-branding.config.json → logoLightPath).
+
+  logo-light-large.png (opcional)
+    → Respaldo para generar iconos PWA si no existe icono.png ni logo-light.png.
 
   logo.png
-    → Favicon, notificaciones, branding. Si no hay logo-light-large.png, la PWA
-      usa este para icon-192 / icon-512.
+    → Logo principal (cabeceras, right-sidebar, etc.). Respaldo final para iconos PWA.
 
   public/icons/icon-192.png y icon-512.png
     → Se regeneran en cada npm run build; no hace falta editarlos a mano.

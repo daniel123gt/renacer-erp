@@ -3,8 +3,9 @@
  *
  * Fuente (prioridad):
  *   1) public/icono.png — icono / favicon oficial (p. ej. marca en fondo claro)
- *   2) public/logo-light-large.png
- *   3) public/logo.png
+ *   2) public/logo-light.png
+ *   3) public/logo-light-large.png
+ *   4) public/logo.png
  *
  * Los iconos se generan sobre fondo blanco (mejor en inicio del SO).
  * NO modifica esos archivos fuente.
@@ -175,10 +176,13 @@ function writePng(png, filePath) {
 
 function pickSourceLogoPath() {
   const icono = path.join(root, "public", "icono.png");
-  const light = path.join(root, "public", "logo-light-large.png");
+  const light = path.join(root, "public", "logo-light.png");
+  const lightLarge = path.join(root, "public", "logo-light-large.png");
   const main = path.join(root, "public", "logo.png");
   if (fs.existsSync(icono)) return { path: icono, label: "public/icono.png" };
-  if (fs.existsSync(light)) return { path: light, label: "public/logo-light-large.png" };
+  if (fs.existsSync(light)) return { path: light, label: "public/logo-light.png" };
+  if (fs.existsSync(lightLarge))
+    return { path: lightLarge, label: "public/logo-light-large.png" };
   if (fs.existsSync(main)) return { path: main, label: "public/logo.png" };
   return null;
 }

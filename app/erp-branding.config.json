@@ -5,6 +5,6 @@
   "accentColor": "#abd9cd",
   "secondaryColor": "#d8dfd6",
   "logoPath": "/logo.png",
-  "logoLightPath": "/logo-light-large.png",
+  "logoLightPath": "/logo-light.png",
   "faviconPath": "/icono.png"
 }

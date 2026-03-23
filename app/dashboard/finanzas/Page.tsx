@@ -17,6 +17,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
 import {
   DollarSign,
@@ -30,6 +38,7 @@ import {
   Trash2,
   Edit,
   Download,
+  RefreshCw,
 } from "lucide-react";
 import {
   finanzasService,
@@ -58,6 +67,10 @@ export default function FinanzasPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTipo, setModalTipo] = useState<"entrada" | "salida">("entrada");
   const [editingTx, setEditingTx] = useState<Transaccion | null>(null);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [syncFecha, setSyncFecha] = useState(() => new Date().toISOString().split("T")[0]);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncSobrescribir, setSyncSobrescribir] = useState(false);
 
   useEffect(() => {
     const n = new Date();
@@ -148,6 +161,27 @@ export default function FinanzasPage() {
     toast.success("CSV exportado");
   };
 
+  const handleSincronizarRenashop = async () => {
+    if (!syncFecha) {
+      toast.error("Selecciona una fecha para sincronizar");
+      return;
+    }
+    setSyncLoading(true);
+    try {
+      const { monto } = await finanzasService.sincronizarVentasRenashopDia(syncFecha, {
+        sobrescribirDuplicado: syncSobrescribir,
+      });
+      toast.success(`Renashop sincronizado: S/ ${formatMoney(monto)}`);
+      setSyncOpen(false);
+      setSyncSobrescribir(false);
+      load();
+    } catch (err: any) {
+      toast.error(err?.message || "No se pudo sincronizar Renashop");
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
   const renderTransactionRow = (tx: Transaccion) => (
     <TableRow key={tx.id} className="group">
       <TableCell className="whitespace-nowrap text-sm">{tx.fecha}</TableCell>
@@ -221,6 +255,14 @@ export default function FinanzasPage() {
           <p className="text-gray-600 mt-1">Balance mensual de la iglesia</p>
         </div>
         <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-primary-blue/30 text-primary-blue hover:bg-primary-blue/5"
+            onClick={() => setSyncOpen(true)}
+          >
+            <RefreshCw className="w-4 h-4 mr-1" /> Sincronizar Renashop
+          </Button>
           <Button
             size="sm"
             className="bg-green-600 hover:bg-green-700"
@@ -483,6 +525,49 @@ export default function FinanzasPage() {
         onSuccess={load}
         editData={editingTx}
       />
+
+      <Dialog open={syncOpen} onOpenChange={setSyncOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sincronizar ventas Renashop</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Fecha de ventas</Label>
+              <Input
+                type="date"
+                value={syncFecha}
+                onChange={(e) => setSyncFecha(e.target.value)}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={syncSobrescribir}
+                onChange={(e) => setSyncSobrescribir(e.target.checked)}
+              />
+              Permitir segunda sincronización en la misma fecha
+            </label>
+            <p className="text-xs text-gray-500">
+              Se registrará una sola <strong>entrada</strong> por la suma total de tickets
+              Renashop del día, con descripción y marca automática.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setSyncOpen(false)} disabled={syncLoading}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSincronizarRenashop}
+                disabled={syncLoading}
+                className="bg-primary-blue hover:bg-primary-blue/90"
+              >
+                {syncLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Sincronizar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

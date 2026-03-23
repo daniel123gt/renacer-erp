@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -24,6 +24,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   DollarSign,
   ShoppingBag,
   Hash,
@@ -48,6 +49,10 @@ import {
 import {
   ventasRenashopService,
   type VentaRenashop,
+  totalVenta,
+  totalGananciaVenta,
+  unidadesVenta,
+  resumenProductosVenta,
 } from "~/services/ventasRenashopService";
 import { AddVentaModal } from "~/components/ui/add-venta-modal";
 
@@ -70,6 +75,16 @@ export default function VentasPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingVenta, setEditingVenta] = useState<VentaRenashop | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -94,14 +109,22 @@ export default function VentasPage() {
     else setMonth(month + 1);
   };
 
-  const totalMes = ventas.reduce((s, v) => s + v.total, 0);
+  const totalCobrado = ventas
+    .filter((v) => v.estado_pago !== "pendiente")
+    .reduce((s, v) => s + totalVenta(v), 0);
+  const totalPendiente = ventas
+    .filter((v) => v.estado_pago === "pendiente")
+    .reduce((s, v) => s + totalVenta(v), 0);
+  const totalMes = totalCobrado + totalPendiente;
   const cantidadVentas = ventas.length;
-  const productosVendidos = ventas.reduce((s, v) => s + v.cantidad, 0);
+  const productosVendidos = ventas.reduce((s, v) => s + unidadesVenta(v), 0);
 
   const chartPorProducto = useMemo(() => {
     const map: Record<string, number> = {};
     ventas.forEach((v) => {
-      map[v.producto_nombre] = (map[v.producto_nombre] ?? 0) + v.total;
+      v.lineas.forEach((l) => {
+        map[l.producto_nombre] = (map[l.producto_nombre] ?? 0) + l.total;
+      });
     });
     return Object.entries(map)
       .map(([name, value]) => ({ name, value }))
@@ -115,7 +138,7 @@ export default function VentasPage() {
       const day = new Date(v.fecha + "T12:00:00");
       const weekNum = Math.ceil(day.getDate() / 7);
       const key = `Semana ${weekNum}`;
-      map[key] = (map[key] ?? 0) + v.total;
+      map[key] = (map[key] ?? 0) + totalVenta(v);
     });
     return Object.entries(map).map(([semana, total]) => ({ semana, total }));
   }, [ventas]);
@@ -124,7 +147,7 @@ export default function VentasPage() {
     const map: Record<string, number> = {};
     ventas.forEach((v) => {
       const method = v.metodo_pago || "Sin especificar";
-      map[method] = (map[method] ?? 0) + v.total;
+      map[method] = (map[method] ?? 0) + totalVenta(v);
     });
     return Object.entries(map).map(([name, value]) => ({ name, value }));
   }, [ventas]);
@@ -153,7 +176,13 @@ export default function VentasPage() {
   const openEdit = (v: VentaRenashop) => { setEditingVenta(v); setModalOpen(true); };
 
   const handleDelete = async (v: VentaRenashop) => {
-    if (!confirm(`¿Eliminar venta de "${v.producto_nombre}" por S/${formatMoney(v.total)}?`)) return;
+    const t = totalVenta(v);
+    if (
+      !confirm(
+        `¿Eliminar la venta del ${v.fecha} (${v.lineas.length} producto(s), total S/ ${formatMoney(t)})?`
+      )
+    )
+      return;
     try {
       await ventasRenashopService.eliminar(v.id);
       toast.success("Venta eliminada");
@@ -164,9 +193,23 @@ export default function VentasPage() {
   };
 
   const handleExportCSV = () => {
-    const headers = "Fecha,Producto,Cantidad,Costo Unit. (S/),P. Venta Unit. (S/),Total (S/),Ganancia (S/),Método de Pago\n";
-    const rows = ventas.map((v) =>
-      [v.fecha, `"${v.producto_nombre}"`, v.cantidad, v.costo_unitario.toFixed(2), v.precio_unitario.toFixed(2), v.total.toFixed(2), v.ganancia.toFixed(2), v.metodo_pago ?? ""].join(",")
+    const headers =
+      "Id venta,Fecha,Producto,Cantidad,Costo Unit. (S/),P. Venta Unit. (S/),Total línea (S/),Ganancia línea (S/),Método de pago,Estado pago\n";
+    const rows = ventas.flatMap((v) =>
+      v.lineas.map((l) =>
+        [
+          v.id,
+          v.fecha,
+          `"${l.producto_nombre}"`,
+          l.cantidad,
+          l.costo_unitario.toFixed(2),
+          l.precio_unitario.toFixed(2),
+          l.total.toFixed(2),
+          l.ganancia.toFixed(2),
+          v.metodo_pago ?? "",
+          v.estado_pago === "pendiente" ? "pendiente" : "pagado",
+        ].join(",")
+      )
     );
     const blob = new Blob([headers + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
@@ -236,15 +279,31 @@ export default function VentasPage() {
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="bg-amber-50 border-amber-200">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-amber-700">Ingresos del Mes</p>
-                    <p className="text-2xl font-bold text-amber-800">S/ {formatMoney(totalMes)}</p>
+                    <p className="text-sm font-medium text-amber-700">Ingresos cobrados</p>
+                    <p className="text-2xl font-bold text-amber-800">S/ {formatMoney(totalCobrado)}</p>
+                    {totalPendiente > 0 && (
+                      <p className="text-xs text-amber-700/80 mt-1">
+                        + S/ {formatMoney(totalPendiente)} pendiente
+                      </p>
+                    )}
                   </div>
                   <DollarSign className="w-8 h-8 text-amber-400" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-orange-100 bg-orange-50/50">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-orange-800">Pendiente de cobro</p>
+                    <p className="text-2xl font-bold text-orange-900">S/ {formatMoney(totalPendiente)}</p>
+                  </div>
+                  <DollarSign className="w-8 h-8 text-orange-300" />
                 </div>
               </CardContent>
             </Card>
@@ -252,7 +311,7 @@ export default function VentasPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Ventas Registradas</p>
+                    <p className="text-sm font-medium text-gray-600">Ventas (tickets)</p>
                     <p className="text-2xl font-bold text-gray-900">{cantidadVentas}</p>
                   </div>
                   <ShoppingBag className="w-8 h-8 text-primary-blue" />
@@ -263,7 +322,7 @@ export default function VentasPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Productos Vendidos</p>
+                    <p className="text-sm font-medium text-gray-600">Productos vendidos</p>
                     <p className="text-2xl font-bold text-gray-900">{productosVendidos}</p>
                   </div>
                   <Hash className="w-8 h-8 text-primary-blue" />
@@ -381,7 +440,7 @@ export default function VentasPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5 text-amber-500" />
-                Detalle de ventas ({cantidadVentas})
+                Detalle de ventas — {cantidadVentas} ticket(s)
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -404,52 +463,130 @@ export default function VentasPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-10" />
                         <TableHead>Fecha</TableHead>
-                        <TableHead>Producto</TableHead>
-                        <TableHead className="text-center">Cant.</TableHead>
-                        <TableHead className="text-right">Costo</TableHead>
-                        <TableHead className="text-right">P. Venta</TableHead>
+                        <TableHead>Productos</TableHead>
+                        <TableHead className="text-center">Ítems</TableHead>
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead className="text-right">Ganancia</TableHead>
                         <TableHead>Método</TableHead>
-                        <TableHead className="w-[70px]"></TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead className="w-[90px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ventas.map((v) => (
-                        <TableRow key={v.id} className="group">
-                          <TableCell className="whitespace-nowrap text-sm">{v.fecha}</TableCell>
-                          <TableCell className="max-w-[180px] truncate font-medium" title={v.producto_nombre}>
-                            {v.producto_nombre}
-                          </TableCell>
-                          <TableCell className="text-center">{v.cantidad}</TableCell>
-                          <TableCell className="text-right text-sm tabular-nums text-red-600">S/ {formatMoney(v.costo_unitario)}</TableCell>
-                          <TableCell className="text-right text-sm tabular-nums">S/ {formatMoney(v.precio_unitario)}</TableCell>
-                          <TableCell className="text-right font-semibold tabular-nums text-amber-600">
-                            S/ {formatMoney(v.total)}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold tabular-nums text-green-600">
-                            S/ {formatMoney(v.ganancia)}
-                          </TableCell>
-                          <TableCell>
-                            {v.metodo_pago ? (
-                              <Badge variant="secondary" className="capitalize text-xs">
-                                {v.metodo_pago}
-                              </Badge>
-                            ) : "—"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button variant="ghost" size="sm" onClick={() => openEdit(v)}>
-                                <Edit className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700" onClick={() => handleDelete(v)}>
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {ventas.map((v) => {
+                        const open = expandedIds.has(v.id);
+                        return (
+                          <Fragment key={v.id}>
+                            <TableRow className="group">
+                              <TableCell className="p-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => toggleExpand(v.id)}
+                                  aria-expanded={open}
+                                >
+                                  {open ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap text-sm font-medium">{v.fecha}</TableCell>
+                              <TableCell className="max-w-[220px]">
+                                <span className="text-sm" title={resumenProductosVenta(v)}>
+                                  {resumenProductosVenta(v)}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center tabular-nums">{v.lineas.length}</TableCell>
+                              <TableCell className="text-right font-semibold tabular-nums text-amber-600">
+                                S/ {formatMoney(totalVenta(v))}
+                              </TableCell>
+                              <TableCell className="text-right font-semibold tabular-nums text-green-600">
+                                S/ {formatMoney(totalGananciaVenta(v))}
+                              </TableCell>
+                              <TableCell>
+                                {v.metodo_pago ? (
+                                  <Badge variant="secondary" className="capitalize text-xs">
+                                    {v.metodo_pago}
+                                  </Badge>
+                                ) : (
+                                  "—"
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {v.estado_pago === "pendiente" ? (
+                                  <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 text-xs">
+                                    Pendiente
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">
+                                    Pagado
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button variant="ghost" size="sm" onClick={() => openEdit(v)}>
+                                    <Edit className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-500 hover:text-red-700"
+                                    onClick={() => handleDelete(v)}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            {open && (
+                              <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+                                <TableCell colSpan={9} className="p-0">
+                                  <div className="px-4 py-3 pl-12 border-t border-gray-100">
+                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                      Líneas del ticket
+                                    </p>
+                                    <div className="overflow-x-auto rounded-md border bg-white">
+                                      <table className="w-full text-sm">
+                                        <thead>
+                                          <tr className="border-b bg-gray-50 text-left text-gray-600">
+                                            <th className="p-2 pr-4">Producto</th>
+                                            <th className="p-2 text-center w-16">Cant.</th>
+                                            <th className="p-2 text-right">P. venta</th>
+                                            <th className="p-2 text-right">Total</th>
+                                            <th className="p-2 text-right">Ganancia</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {v.lineas.map((l) => (
+                                            <tr key={l.id} className="border-b last:border-0">
+                                              <td className="p-2 pr-4 font-medium">{l.producto_nombre}</td>
+                                              <td className="p-2 text-center tabular-nums">{l.cantidad}</td>
+                                              <td className="p-2 text-right tabular-nums">S/ {formatMoney(l.precio_unitario)}</td>
+                                              <td className="p-2 text-right tabular-nums text-amber-700">
+                                                S/ {formatMoney(l.total)}
+                                              </td>
+                                              <td className="p-2 text-right tabular-nums text-green-700">
+                                                S/ {formatMoney(l.ganancia)}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

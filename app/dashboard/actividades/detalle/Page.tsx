@@ -265,6 +265,26 @@ export default function ActividadDetallePage() {
         </Card>
       </div>
 
+      {actividad.insumos.length > 0 && (
+        <Card className="border-red-100">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-red-900">Desglose de insumos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-red-100 text-sm">
+              {actividad.insumos.map((i, idx) => (
+                <li key={`${i.nombre}-${idx}`} className="flex justify-between gap-4 py-2.5 first:pt-0">
+                  <span className="text-gray-800">{i.nombre}</span>
+                  <span className="font-semibold tabular-nums text-red-800 shrink-0">
+                    S/ {formatMoney(i.costo)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>

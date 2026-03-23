@@ -267,4 +267,71 @@ export const finanzasService = {
       }))
       .sort((a, b) => a.mes.localeCompare(b.mes));
   },
+
+  /**
+   * Sincroniza ventas de Renashop de un día como una sola entrada en Finanzas.
+   * Por defecto evita duplicados usando un marcador en notas: renashop_sync:YYYY-MM-DD
+   */
+  async sincronizarVentasRenashopDia(
+    fecha: string,
+    options?: { sobrescribirDuplicado?: boolean }
+  ): Promise<{ monto: number; transaccion: Transaccion }> {
+    const marker = `renashop_sync:${fecha}`;
+    const sobrescribirDuplicado = options?.sobrescribirDuplicado === true;
+
+    if (!sobrescribirDuplicado) {
+      const { data: dupRows, error: dupErr } = await supabase
+        .from("transacciones")
+        .select("id")
+        .eq("tipo", "entrada")
+        .eq("fecha", fecha)
+        .ilike("notas", `%${marker}%`)
+        .limit(1);
+      if (dupErr) throw dupErr;
+      if ((dupRows ?? []).length > 0) {
+        throw new Error("Ya existe una sincronización de Renashop para esa fecha.");
+      }
+    }
+
+    const { data: cabs, error: cabsErr } = await supabase
+      .from("ventas_renashop_cabeceras")
+      .select("id")
+      .eq("fecha", fecha);
+    if (cabsErr) throw cabsErr;
+    const ids = (cabs ?? []).map((r: any) => r.id);
+    if (ids.length === 0) {
+      throw new Error("No hay ventas de Renashop en la fecha seleccionada.");
+    }
+
+    const { data: lines, error: linesErr } = await supabase
+      .from("ventas_renashop_lineas")
+      .select("total")
+      .in("venta_id", ids);
+    if (linesErr) throw linesErr;
+    const monto = (lines ?? []).reduce((s: number, r: any) => s + Number(r.total), 0);
+    if (monto <= 0) {
+      throw new Error("Las ventas de Renashop de esa fecha suman 0.");
+    }
+
+    const { data: cat, error: catErr } = await supabase
+      .from("categorias_finanzas")
+      .select("id")
+      .eq("tipo", "entrada")
+      .eq("nombre", "Venta Renashop")
+      .limit(1)
+      .maybeSingle();
+    if (catErr) throw catErr;
+
+    const input: TransaccionInput = {
+      fecha,
+      tipo: "entrada",
+      categoria_id: cat?.id ?? null,
+      descripcion: `Sincronización Renashop ${fecha}`,
+      monto,
+      metodo_pago: "otro",
+      notas: `${marker} | tickets:${ids.length}`,
+    };
+    const transaccion = await this.crear(input);
+    return { monto, transaccion };
+  },
 };
