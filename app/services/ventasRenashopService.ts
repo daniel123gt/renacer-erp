@@ -23,6 +23,7 @@ export interface VentaRenashop {
   fecha: string;
   metodo_pago: string | null;
   estado_pago: EstadoPagoVenta;
+  nombre: string | null;
   notas: string | null;
   created_at: string;
   created_by: string | null;
@@ -33,6 +34,7 @@ export interface VentaCabeceraInput {
   fecha: string;
   metodo_pago?: string;
   estado_pago?: EstadoPagoVenta;
+  nombre?: string | null;
   notas?: string;
 }
 
@@ -83,6 +85,7 @@ function mapVenta(row: any): VentaRenashop {
     fecha: String(row.fecha).slice(0, 10),
     metodo_pago: row.metodo_pago ?? null,
     estado_pago: mapEstado(row.estado_pago),
+    nombre: row.nombre != null && String(row.nombre).trim() !== "" ? String(row.nombre).trim() : null,
     notas: row.notas ?? null,
     created_at: String(row.created_at),
     created_by: row.created_by ?? null,
@@ -122,6 +125,7 @@ export const ventasRenashopService = {
         fecha,
         metodo_pago,
         estado_pago,
+        nombre,
         notas,
         created_at,
         created_by,
@@ -159,6 +163,7 @@ export const ventasRenashopService = {
         fecha,
         metodo_pago,
         estado_pago,
+        nombre,
         notas,
         created_at,
         created_by,
@@ -204,6 +209,7 @@ export const ventasRenashopService = {
           fecha: cabecera.fecha,
           metodo_pago: cabecera.metodo_pago || "plin",
           estado_pago: estado,
+          nombre: cabecera.nombre?.trim() || null,
           notas: cabecera.notas?.trim() || null,
           created_by: uid,
         })
@@ -263,6 +269,7 @@ export const ventasRenashopService = {
           fecha: cabecera.fecha,
           metodo_pago: cabecera.metodo_pago || "plin",
           estado_pago: estado,
+          nombre: cabecera.nombre?.trim() || null,
           notas: cabecera.notas?.trim() || null,
         })
         .eq("id", ventaId);

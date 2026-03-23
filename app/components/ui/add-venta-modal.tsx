@@ -17,11 +17,12 @@ import {
 } from "~/components/ui/select";
 import { Combobox } from "~/components/ui/combobox";
 import { toast } from "sonner";
-import { Loader2, Minus, Plus, Trash2, Package } from "lucide-react";
+import { Loader2, Minus, Plus, Trash2, Package, Banknote, Ellipsis } from "lucide-react";
 import {
   ventasRenashopService,
   type VentaRenashop,
   type EstadoPagoVenta,
+  type VentaLineaInput,
 } from "~/services/ventasRenashopService";
 import { inventoryService, type InventoryItem } from "~/services/inventoryService";
 import { cn } from "~/lib/utils";
@@ -33,17 +34,19 @@ interface Props {
   editData?: VentaRenashop | null;
 }
 
-const METODOS_PAGO = [
-  { value: "efectivo", label: "Efectivo" },
-  { value: "plin", label: "Plin" },
-  { value: "transferencia", label: "Transferencia" },
-  { value: "otro", label: "Otro" },
-];
-
 const ESTADOS_PAGO: { value: EstadoPagoVenta; label: string }[] = [
   { value: "pagado", label: "Pagado" },
   { value: "pendiente", label: "Pendiente de pago" },
 ];
+
+/** Métodos permitidos al editar (registro nuevo usa tarjetas: plin | efectivo | otro) */
+const METODOS_EDICION = [
+  { value: "plin", label: "Plin" },
+  { value: "efectivo", label: "Efectivo" },
+  { value: "otro", label: "Otro" },
+] as const;
+
+type MetodoTarjeta = "plin" | "efectivo" | "otro";
 
 type CartLine = {
   lineId: string;
@@ -67,25 +70,71 @@ function newLineFromProduct(p: InventoryItem): CartLine {
   };
 }
 
+function validateCartForSave(cart: CartLine[], isEditing: boolean): boolean {
+  if (cart.length === 0) {
+    toast.error("Añade al menos un producto");
+    return false;
+  }
+  for (const line of cart) {
+    if (!line.producto_nombre.trim()) {
+      toast.error("Hay una línea sin nombre de producto");
+      return false;
+    }
+    if (line.precio_unitario <= 0) {
+      toast.error(`Precio inválido en: ${line.producto_nombre}`);
+      return false;
+    }
+    if (line.cantidad < 1) {
+      toast.error("La cantidad debe ser al menos 1");
+      return false;
+    }
+  }
+  if (!isEditing) {
+    for (const line of cart) {
+      if (!line.producto_id) {
+        toast.error("Solo se pueden registrar productos del inventario");
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props) {
   const [productos, setProductos] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [fecha, setFecha] = useState(() => new Date().toISOString().split("T")[0]);
   const [metodoPago, setMetodoPago] = useState("plin");
   const [estadoPago, setEstadoPago] = useState<EstadoPagoVenta>("pagado");
+  const [nombreCliente, setNombreCliente] = useState("");
   const [notas, setNotas] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [pickerValue, setPickerValue] = useState("");
 
+  const [paymentPickOpen, setPaymentPickOpen] = useState(false);
+  const [pickedMetodo, setPickedMetodo] = useState<MetodoTarjeta>("plin");
+
   const isEditing = !!editData;
+
+  const metodosEdicionItems = useMemo(() => {
+    const raw = (editData?.metodo_pago ?? "").trim().toLowerCase();
+    const base = [...METODOS_EDICION];
+    if (raw && !base.some((m) => m.value === raw)) {
+      return [...base, { value: raw, label: `${raw} (actual)` }];
+    }
+    return base;
+  }, [editData?.metodo_pago]);
 
   useEffect(() => {
     if (open) {
       inventoryService.list().then(setProductos).catch(() => {});
+      setPaymentPickOpen(false);
       if (editData) {
         setFecha(editData.fecha);
-        setMetodoPago(editData.metodo_pago ?? "plin");
+        const m = (editData.metodo_pago ?? "plin").toLowerCase();
+        setMetodoPago(m);
         setEstadoPago(editData.estado_pago === "pendiente" ? "pendiente" : "pagado");
+        setNombreCliente(editData.nombre ?? "");
         setNotas(editData.notas ?? "");
         setCart(
           (editData.lineas ?? []).map((l) => ({
@@ -102,8 +151,10 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
         setFecha(new Date().toISOString().split("T")[0]);
         setMetodoPago("plin");
         setEstadoPago("pagado");
+        setNombreCliente("");
         setNotas("");
         setCart([]);
+        setPickedMetodo("plin");
       }
       setPickerValue("");
     }
@@ -169,62 +220,78 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
     [cart]
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (cart.length === 0) {
-      toast.error("Añade al menos un producto");
-      return;
-    }
-    for (const line of cart) {
-      if (!line.producto_nombre.trim()) {
-        toast.error("Hay una línea sin nombre de producto");
-        return;
-      }
-      if (line.precio_unitario <= 0) {
-        toast.error(`Precio inválido en: ${line.producto_nombre}`);
-        return;
-      }
-      if (line.cantidad < 1) {
-        toast.error("La cantidad debe ser al menos 1");
-        return;
-      }
-    }
-    if (!isEditing) {
-      for (const line of cart) {
-        if (!line.producto_id) {
-          toast.error("Solo se pueden registrar productos del inventario");
-          return;
-        }
-      }
-    }
+  const nombreRequerido = estadoPago === "pendiente";
 
-    const lineasPayload = cart.map((l) => ({
+  const buildLineasPayload = (): VentaLineaInput[] =>
+    cart.map((l) => ({
       producto_id: l.producto_id,
       producto_nombre: l.producto_nombre.trim(),
       cantidad: l.cantidad,
       costo_unitario: l.costo_unitario,
       precio_unitario: l.precio_unitario,
     }));
+
+  const validateNombre = (): boolean => {
+    if (nombreRequerido && !nombreCliente.trim()) {
+      toast.error("Indica el nombre (obligatorio si el pago está pendiente)");
+      return false;
+    }
+    return true;
+  };
+
+  const openPaymentPicker = () => {
+    if (!validateCartForSave(cart, false)) return;
+    if (!validateNombre()) return;
+    setPickedMetodo(estadoPago === "pendiente" ? "otro" : "plin");
+    setPaymentPickOpen(true);
+  };
+
+  const confirmarNuevaVenta = async () => {
+    const lineasPayload = buildLineasPayload();
+    const cabecera = {
+      fecha,
+      metodo_pago: pickedMetodo,
+      estado_pago: estadoPago,
+      nombre: nombreCliente.trim() || undefined,
+      notas: notas.trim() || undefined,
+    };
+    setLoading(true);
+    try {
+      await ventasRenashopService.crearVenta(lineasPayload, cabecera);
+      toast.success("Venta registrada");
+      setPaymentPickOpen(false);
+      onSuccess();
+      onOpenChange(false);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error al guardar");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editData) return;
+    if (!validateCartForSave(cart, true)) return;
+    if (!validateNombre()) return;
+
+    const lineasPayload = buildLineasPayload();
     const cabecera = {
       fecha,
       metodo_pago: metodoPago || "plin",
       estado_pago: estadoPago,
+      nombre: nombreCliente.trim() || undefined,
       notas: notas.trim() || undefined,
     };
 
     setLoading(true);
     try {
-      if (isEditing && editData) {
-        await ventasRenashopService.actualizarVenta(editData.id, cabecera, lineasPayload);
-        toast.success("Venta actualizada");
-      } else {
-        await ventasRenashopService.crearVenta(lineasPayload, cabecera);
-        toast.success("Venta registrada");
-      }
+      await ventasRenashopService.actualizarVenta(editData.id, cabecera, lineasPayload);
+      toast.success("Venta actualizada");
       onSuccess();
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err?.message || "Error al guardar");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error al guardar");
     } finally {
       setLoading(false);
     }
@@ -234,16 +301,10 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
-          "w-[95vw] max-w-[95vw] max-h-[92vh] overflow-y-auto sm:max-w-[min(96vw,720px)]",
+          "relative w-[95vw] max-w-[95vw] max-h-[92vh] overflow-y-auto sm:max-w-[min(96vw,720px)]",
           "top-[50%] translate-y-[-50%] p-4 sm:p-6",
-          /* Móvil: modal a pantalla completa */
           "max-sm:inset-0 max-sm:top-0 max-sm:left-0 max-sm:right-0 max-sm:bottom-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-full max-sm:max-w-full",
           "max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
-          /*
-            Móvil: el Dialog base usa `display: grid` + altura fija; el espacio sobrante puede
-            repartirse entre filas (align-content) y deja un hueco enorme bajo el título.
-            Forzamos columna flex pegada arriba (justify-start) y sin gap.
-          */
           "max-sm:!flex max-sm:flex-col max-sm:items-stretch max-sm:justify-start max-sm:content-start max-sm:!gap-0 max-sm:p-3 max-sm:pt-3 max-sm:pb-4"
         )}
       >
@@ -253,14 +314,18 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
           </DialogTitle>
         </DialogHeader>
         <form
-          onSubmit={handleSubmit}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (isEditing) void handleSubmitEdit(e);
+          }}
           className="min-h-0 space-y-4 max-sm:mt-0 max-sm:flex-1 max-sm:space-y-3 max-sm:overflow-y-auto"
         >
-          {/*
-            Móvil: Fecha | Método de pago en la misma fila; Estado del pago ancho completo debajo.
-            sm+: tres columnas como antes.
-          */}
-          <div className="grid grid-cols-2 gap-2 min-w-0 sm:grid-cols-3 sm:gap-3">
+          <div
+            className={cn(
+              "grid gap-2 min-w-0 sm:gap-3",
+              isEditing ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-2"
+            )}
+          >
             <div className="min-w-0">
               <Label>Fecha</Label>
               <Input
@@ -271,22 +336,24 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
                 className="max-sm:min-w-0"
               />
             </div>
+            {isEditing && (
+              <div className="min-w-0">
+                <Label>Método de pago</Label>
+                <Select value={metodoPago} onValueChange={setMetodoPago}>
+                  <SelectTrigger className="max-sm:min-w-0">
+                    <SelectValue placeholder="Método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {metodosEdicionItems.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="min-w-0">
-              <Label>Método de pago</Label>
-              <Select value={metodoPago} onValueChange={setMetodoPago}>
-                <SelectTrigger className="max-sm:min-w-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {METODOS_PAGO.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-2 min-w-0 sm:col-span-1">
               <Label>Estado del pago</Label>
               <Select
                 value={estadoPago}
@@ -304,6 +371,20 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="venta-nombre-cliente">
+              Nombre {nombreRequerido ? <span className="text-red-500">*</span> : <span className="text-muted-foreground font-normal">(opcional)</span>}
+            </Label>
+            <Input
+              id="venta-nombre-cliente"
+              placeholder={nombreRequerido ? "Quién debe o compró a crédito" : "Ej: nombre del comprador"}
+              value={nombreCliente}
+              onChange={(e) => setNombreCliente(e.target.value)}
+              required={nombreRequerido}
+              className="mt-1"
+            />
           </div>
 
           <div>
@@ -447,12 +528,122 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading} className="bg-amber-500 hover:bg-amber-600">
-              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {isEditing ? "Guardar cambios" : "Registrar venta"}
-            </Button>
+            {isEditing ? (
+              <Button type="submit" disabled={loading} className="bg-amber-500 hover:bg-amber-600">
+                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Guardar cambios
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                disabled={loading}
+                className="bg-amber-500 hover:bg-amber-600"
+                onClick={openPaymentPicker}
+              >
+                Registrar venta
+              </Button>
+            )}
           </div>
         </form>
+
+        {/* Paso: elegir método de pago (solo venta nueva) */}
+        {paymentPickOpen && !isEditing && (
+          <div
+            className="absolute inset-0 z-[80] flex items-center justify-center bg-black/50 p-3 sm:p-6 rounded-lg max-sm:rounded-none"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="payment-pick-title"
+          >
+            <div className="w-full max-w-md rounded-xl bg-white shadow-xl border p-4 sm:p-5 space-y-4 max-h-[min(90vh,520px)] overflow-y-auto">
+              <h3 id="payment-pick-title" className="text-lg font-semibold text-center">
+                ¿Cómo se pagó?
+              </h3>
+              <p className="text-sm text-muted-foreground text-center">
+                Elige el método. Si el pago está pendiente, &quot;Otro&quot; viene sugerido.
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setPickedMetodo("plin")}
+                  className={cn(
+                    "w-full rounded-xl border-2 p-3 text-left transition-all hover:bg-amber-50/80",
+                    pickedMetodo === "plin"
+                      ? "border-amber-500 ring-2 ring-amber-400/50 bg-amber-50/50"
+                      : "border-gray-200"
+                  )}
+                >
+                  <span className="text-sm font-semibold block mb-2">Plin</span>
+                  <div className="h-24 w-full rounded-lg overflow-hidden bg-gray-100 border">
+                    <img
+                      src="/plin.jpg"
+                      alt="Plin"
+                      className="h-full w-full object-cover object-right"
+                    />
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPickedMetodo("efectivo")}
+                  className={cn(
+                    "w-full rounded-xl border-2 p-4 flex items-center gap-4 transition-all hover:bg-emerald-50/80",
+                    pickedMetodo === "efectivo"
+                      ? "border-emerald-500 ring-2 ring-emerald-400/50 bg-emerald-50/40"
+                      : "border-gray-200"
+                  )}
+                >
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
+                    <Banknote className="h-9 w-9" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <span className="font-semibold block">Efectivo</span>
+                    <span className="text-sm text-muted-foreground">Pago en billetes o monedas</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPickedMetodo("otro")}
+                  className={cn(
+                    "w-full rounded-xl border-2 p-4 flex items-center gap-4 transition-all hover:bg-slate-50",
+                    pickedMetodo === "otro"
+                      ? "border-slate-600 ring-2 ring-slate-400/40 bg-slate-50"
+                      : "border-gray-200"
+                  )}
+                >
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                    <Ellipsis className="h-9 w-9" strokeWidth={2} />
+                  </div>
+                  <div>
+                    <span className="font-semibold block">Otro</span>
+                    <span className="text-sm text-muted-foreground">Otro medio</span>
+                  </div>
+                </button>
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPaymentPickOpen(false)}
+                  disabled={loading}
+                >
+                  Volver
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-amber-500 hover:bg-amber-600"
+                  disabled={loading}
+                  onClick={() => void confirmarNuevaVenta()}
+                >
+                  {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Confirmar venta
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

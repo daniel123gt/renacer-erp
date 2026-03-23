@@ -194,13 +194,14 @@ export default function VentasPage() {
 
   const handleExportCSV = () => {
     const headers =
-      "Id venta,Fecha,Producto,Cantidad,Costo Unit. (S/),P. Venta Unit. (S/),Total línea (S/),Ganancia línea (S/),Método de pago,Estado pago\n";
+      "Id venta,Fecha,Nombre,Producto,Cantidad,Costo Unit. (S/),P. Venta Unit. (S/),Total línea (S/),Ganancia línea (S/),Método de pago,Estado pago\n";
     const rows = ventas.flatMap((v) =>
       v.lineas.map((l) =>
         [
           v.id,
           v.fecha,
-          `"${l.producto_nombre}"`,
+          `"${(v.nombre ?? "").replace(/"/g, '""')}"`,
+          `"${l.producto_nombre.replace(/"/g, '""')}"`,
           l.cantidad,
           l.costo_unitario.toFixed(2),
           l.precio_unitario.toFixed(2),
@@ -465,6 +466,7 @@ export default function VentasPage() {
                       <TableRow>
                         <TableHead className="w-10" />
                         <TableHead>Fecha</TableHead>
+                        <TableHead className="max-w-[100px]">Nombre</TableHead>
                         <TableHead>Productos</TableHead>
                         <TableHead className="text-center">Ítems</TableHead>
                         <TableHead className="text-right">Total</TableHead>
@@ -497,6 +499,9 @@ export default function VentasPage() {
                                 </Button>
                               </TableCell>
                               <TableCell className="whitespace-nowrap text-sm font-medium">{v.fecha}</TableCell>
+                              <TableCell className="max-w-[100px] text-sm text-gray-700 truncate" title={v.nombre ?? ""}>
+                                {v.nombre?.trim() ? v.nombre : "—"}
+                              </TableCell>
                               <TableCell className="max-w-[220px]">
                                 <span className="text-sm" title={resumenProductosVenta(v)}>
                                   {resumenProductosVenta(v)}
@@ -547,7 +552,7 @@ export default function VentasPage() {
                             </TableRow>
                             {open && (
                               <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
-                                <TableCell colSpan={9} className="p-0">
+                                <TableCell colSpan={10} className="p-0">
                                   <div className="px-4 py-3 pl-12 border-t border-gray-100">
                                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                                       Líneas del ticket
