@@ -238,29 +238,43 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
           "top-[50%] translate-y-[-50%] p-4 sm:p-6",
           /* Móvil: modal a pantalla completa */
           "max-sm:inset-0 max-sm:top-0 max-sm:left-0 max-sm:right-0 max-sm:bottom-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-full max-sm:max-w-full",
-          "max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0"
+          "max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
+          /*
+            Móvil: el Dialog base usa `display: grid` + altura fija; el espacio sobrante puede
+            repartirse entre filas (align-content) y deja un hueco enorme bajo el título.
+            Forzamos columna flex pegada arriba (justify-start) y sin gap.
+          */
+          "max-sm:!flex max-sm:flex-col max-sm:items-stretch max-sm:justify-start max-sm:content-start max-sm:!gap-0 max-sm:p-3 max-sm:pt-3 max-sm:pb-4"
         )}
       >
-        <DialogHeader>
-          <DialogTitle className="text-xl">
+        <DialogHeader className="max-sm:shrink-0 max-sm:space-y-0 max-sm:p-0 max-sm:mx-0 max-sm:mt-0 max-sm:text-left max-sm:mb-5">
+          <DialogTitle className="text-xl max-sm:text-lg max-sm:leading-tight max-sm:pr-10 max-sm:!mb-0 max-sm:!mt-0">
             {isEditing ? "Editar venta" : "Registrar venta"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
+        <form
+          onSubmit={handleSubmit}
+          className="min-h-0 space-y-4 max-sm:mt-0 max-sm:flex-1 max-sm:space-y-3 max-sm:overflow-y-auto"
+        >
+          {/*
+            Móvil: Fecha | Método de pago en la misma fila; Estado del pago ancho completo debajo.
+            sm+: tres columnas como antes.
+          */}
+          <div className="grid grid-cols-2 gap-2 min-w-0 sm:grid-cols-3 sm:gap-3">
+            <div className="min-w-0">
               <Label>Fecha</Label>
               <Input
                 type="date"
                 value={fecha}
                 onChange={(e) => setFecha(e.target.value)}
                 required
+                className="max-sm:min-w-0"
               />
             </div>
-            <div>
+            <div className="min-w-0">
               <Label>Método de pago</Label>
               <Select value={metodoPago} onValueChange={setMetodoPago}>
-                <SelectTrigger>
+                <SelectTrigger className="max-sm:min-w-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -272,7 +286,7 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="col-span-2 min-w-0 sm:col-span-1">
               <Label>Estado del pago</Label>
               <Select
                 value={estadoPago}
