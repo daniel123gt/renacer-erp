@@ -9,6 +9,7 @@ import { getPrimaryColor } from "~/lib/erpBranding";
 import { Menu } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { NotificationBell } from "~/components/ui/notification-bell";
+import { InventoryStockAlerts } from "~/components/ui/inventory-stock-alerts";
 import supabase from "~/utils/supabase";
 
 function MobileMenuButton() {
@@ -147,7 +148,10 @@ export default function Layout() {
               <MobileMenuButton />
             </div>
             <div className="flex-1 min-w-0" aria-hidden />
-            <NotificationBell />
+            <div className="flex items-center gap-0.5 shrink-0">
+              <InventoryStockAlerts />
+              <NotificationBell />
+            </div>
           </div>
           <Outlet />
         </div>

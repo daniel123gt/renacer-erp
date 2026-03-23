@@ -82,6 +82,80 @@ function rowToItem(r: MaterialsRow): InventoryItem {
 const MATERIALS_SELECT =
   "id, name, cost_soles, precio_venta, is_active, stock, proveedor, estado, categoria, description, min_stock, max_stock, unit, last_restocked, expiry_date, imagen_url";
 
+/** Líneas de venta Renashop con vínculo a inventario (solo filas con producto_id ajustan stock). */
+export type RenashopLineaStock = {
+  producto_id: string | null;
+  cantidad: number;
+};
+
+function aggregateQtyByProduct(lineas: RenashopLineaStock[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const { producto_id, cantidad } of lineas) {
+    if (!producto_id) continue;
+    const q = Number(cantidad);
+    if (!Number.isFinite(q) || q <= 0) continue;
+    m.set(producto_id, (m.get(producto_id) ?? 0) + q);
+  }
+  return m;
+}
+
+/**
+ * Ajusta `materials.stock` según ventas Renashop:
+ * - `releaseLineas`: unidades que vuelven al inventario (anular venta o edición).
+ * - `consumeLineas`: unidades que salen del inventario (venta nueva o edición).
+ * Por producto: stock_nuevo = stock_actual + sum(release) − sum(consume).
+ */
+export async function applyRenashopStockDelta(
+  releaseLineas: RenashopLineaStock[],
+  consumeLineas: RenashopLineaStock[]
+): Promise<void> {
+  const release = aggregateQtyByProduct(releaseLineas);
+  const consume = aggregateQtyByProduct(consumeLineas);
+  const allIds = new Set<string>([...release.keys(), ...consume.keys()]);
+  if (allIds.size === 0) return;
+
+  const { data: rows, error } = await supabase
+    .from("materials")
+    .select("id, name, stock, min_stock, estado")
+    .in("id", [...allIds]);
+  if (error) throw error;
+
+  const byId = new Map<string, MaterialsRow>((rows ?? []).map((r: any) => [String(r.id), r as MaterialsRow]));
+
+  const deltas = new Map<string, number>();
+  for (const id of allIds) {
+    const add = release.get(id) ?? 0;
+    const sub = consume.get(id) ?? 0;
+    deltas.set(id, add - sub);
+  }
+
+  for (const [id, delta] of deltas) {
+    if (delta === 0) continue;
+    const row = byId.get(id);
+    if (!row) {
+      throw new Error(`Producto no encontrado en inventario.`);
+    }
+    const current = Number(row.stock ?? 0);
+    const minStock = Number(row.min_stock ?? 0);
+    const next = current + delta;
+    if (next < 0) {
+      const name = (row as { name?: string }).name ?? id;
+      const need = consume.get(id) ?? 0;
+      const back = release.get(id) ?? 0;
+      throw new Error(
+        `Stock insuficiente para "${name}". Disponible: ${current}. ` +
+          (need > back ? `Esta operación requiere ${need - back} unidades más.` : "")
+      );
+    }
+    const estado = computeStatus(next, minStock, row.estado);
+    const { error: uErr } = await supabase
+      .from("materials")
+      .update({ stock: next, estado })
+      .eq("id", id);
+    if (uErr) throw uErr;
+  }
+}
+
 export interface ListInventoryResult {
   data: InventoryItem[];
   total: number;

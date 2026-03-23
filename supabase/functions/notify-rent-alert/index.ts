@@ -7,6 +7,7 @@
  * - Si es viernes/sábado/domingo: solo 2 veces al día (06:00 y 20:00).
  *
  * Cuando saldo del mes < app_config.cuota_alquiler -> crea notificación y email (con dedupe por franja).
+ * Si en la semana ISO actual (lun–dom, Lima) ya hay una salida categorizada "Alquiler", no se envía.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 
@@ -137,6 +138,28 @@ Deno.serve(async (req) => {
           ok: true,
           skipped: true,
           reason: "Saldo suficiente",
+          saldo,
+          cuota,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const { data: haySalidaAlquilerRaw, error: hayErr } = await supabase.rpc(
+      "fn_hay_salida_alquiler_semana_actual_lima",
+    );
+    if (hayErr) throw hayErr;
+    const haySalidaAlquilerSemana =
+      haySalidaAlquilerRaw === true ||
+      haySalidaAlquilerRaw === "true" ||
+      haySalidaAlquilerRaw === "t";
+
+    if (haySalidaAlquilerSemana) {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          skipped: true,
+          reason: "Ya hay salida de alquiler registrada esta semana (lun–dom Lima)",
           saldo,
           cuota,
         }),

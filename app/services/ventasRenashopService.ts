@@ -1,4 +1,5 @@
 import supabase from "~/utils/supabase";
+import { applyRenashopStockDelta } from "~/services/inventoryService";
 
 /** Cobrado vs venta fiada / por cobrar */
 export type EstadoPagoVenta = "pagado" | "pendiente";
@@ -181,45 +182,56 @@ export const ventasRenashopService = {
     return mapVenta(data);
   },
 
-  /** Nuevo ticket: cabecera + líneas en una sola operación lógica */
+  /** Nuevo ticket: cabecera + líneas en una sola operación lógica; descuenta inventario por líneas con producto_id */
   async crearVenta(lineas: VentaLineaInput[], cabecera: VentaCabeceraInput): Promise<VentaRenashop> {
     if (lineas.length === 0) throw new Error("La venta debe tener al menos una línea");
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData?.user?.id ?? null;
     const estado = cabecera.estado_pago === "pendiente" ? "pendiente" : "pagado";
 
-    const { data: cabRow, error: cabErr } = await supabase
-      .from(CAB)
-      .insert({
-        fecha: cabecera.fecha,
-        metodo_pago: cabecera.metodo_pago || "plin",
-        estado_pago: estado,
-        notas: cabecera.notas?.trim() || null,
-        created_by: uid,
-      })
-      .select("id")
-      .single();
-    if (cabErr) throw cabErr;
-    const ventaId = cabRow.id as string;
+    const stockLineas = lineas.map((l) => ({
+      producto_id: l.producto_id,
+      cantidad: l.cantidad,
+    }));
 
-    const lineRows = lineas.map((line) => {
-      const total = line.cantidad * line.precio_unitario;
-      const ganancia = (line.precio_unitario - line.costo_unitario) * line.cantidad;
-      return {
-        venta_id: ventaId,
-        producto_id: line.producto_id || null,
-        producto_nombre: line.producto_nombre.trim(),
-        cantidad: line.cantidad,
-        costo_unitario: line.costo_unitario,
-        precio_unitario: line.precio_unitario,
-        total,
-        ganancia,
-      };
-    });
-    const { error: linErr } = await supabase.from(LIN).insert(lineRows);
-    if (linErr) {
-      await supabase.from(CAB).delete().eq("id", ventaId);
-      throw linErr;
+    await applyRenashopStockDelta([], stockLineas);
+
+    let ventaId: string | null = null;
+    try {
+      const { data: cabRow, error: cabErr } = await supabase
+        .from(CAB)
+        .insert({
+          fecha: cabecera.fecha,
+          metodo_pago: cabecera.metodo_pago || "plin",
+          estado_pago: estado,
+          notas: cabecera.notas?.trim() || null,
+          created_by: uid,
+        })
+        .select("id")
+        .single();
+      if (cabErr) throw cabErr;
+      ventaId = cabRow.id as string;
+
+      const lineRows = lineas.map((line) => {
+        const total = line.cantidad * line.precio_unitario;
+        const ganancia = (line.precio_unitario - line.costo_unitario) * line.cantidad;
+        return {
+          venta_id: ventaId,
+          producto_id: line.producto_id || null,
+          producto_nombre: line.producto_nombre.trim(),
+          cantidad: line.cantidad,
+          costo_unitario: line.costo_unitario,
+          precio_unitario: line.precio_unitario,
+          total,
+          ganancia,
+        };
+      });
+      const { error: linErr } = await supabase.from(LIN).insert(lineRows);
+      if (linErr) throw linErr;
+    } catch (e) {
+      await applyRenashopStockDelta(stockLineas, []).catch(() => {});
+      if (ventaId) await supabase.from(CAB).delete().eq("id", ventaId);
+      throw e;
     }
 
     const full = await this.getById(ventaId);
@@ -227,7 +239,7 @@ export const ventasRenashopService = {
     return full;
   },
 
-  /** Sustituye líneas y actualiza cabecera */
+  /** Sustituye líneas y actualiza cabecera; reajusta inventario (líneas viejas → devolver, nuevas → descontar) */
   async actualizarVenta(
     ventaId: string,
     cabecera: VentaCabeceraInput,
@@ -236,36 +248,49 @@ export const ventasRenashopService = {
     if (lineas.length === 0) throw new Error("La venta debe tener al menos una línea");
     const estado = cabecera.estado_pago === "pendiente" ? "pendiente" : "pagado";
 
-    const { error: uErr } = await supabase
-      .from(CAB)
-      .update({
-        fecha: cabecera.fecha,
-        metodo_pago: cabecera.metodo_pago || "plin",
-        estado_pago: estado,
-        notas: cabecera.notas?.trim() || null,
-      })
-      .eq("id", ventaId);
-    if (uErr) throw uErr;
+    const prev = await this.getById(ventaId);
+    if (!prev) throw new Error("Venta no encontrada");
 
-    const { error: dErr } = await supabase.from(LIN).delete().eq("venta_id", ventaId);
-    if (dErr) throw dErr;
+    const oldStock = prev.lineas.map((l) => ({ producto_id: l.producto_id, cantidad: l.cantidad }));
+    const newStock = lineas.map((l) => ({ producto_id: l.producto_id, cantidad: l.cantidad }));
 
-    const lineRows = lineas.map((line) => {
-      const total = line.cantidad * line.precio_unitario;
-      const ganancia = (line.precio_unitario - line.costo_unitario) * line.cantidad;
-      return {
-        venta_id: ventaId,
-        producto_id: line.producto_id || null,
-        producto_nombre: line.producto_nombre.trim(),
-        cantidad: line.cantidad,
-        costo_unitario: line.costo_unitario,
-        precio_unitario: line.precio_unitario,
-        total,
-        ganancia,
-      };
-    });
-    const { error: iErr } = await supabase.from(LIN).insert(lineRows);
-    if (iErr) throw iErr;
+    await applyRenashopStockDelta(oldStock, newStock);
+
+    try {
+      const { error: uErr } = await supabase
+        .from(CAB)
+        .update({
+          fecha: cabecera.fecha,
+          metodo_pago: cabecera.metodo_pago || "plin",
+          estado_pago: estado,
+          notas: cabecera.notas?.trim() || null,
+        })
+        .eq("id", ventaId);
+      if (uErr) throw uErr;
+
+      const { error: dErr } = await supabase.from(LIN).delete().eq("venta_id", ventaId);
+      if (dErr) throw dErr;
+
+      const lineRows = lineas.map((line) => {
+        const total = line.cantidad * line.precio_unitario;
+        const ganancia = (line.precio_unitario - line.costo_unitario) * line.cantidad;
+        return {
+          venta_id: ventaId,
+          producto_id: line.producto_id || null,
+          producto_nombre: line.producto_nombre.trim(),
+          cantidad: line.cantidad,
+          costo_unitario: line.costo_unitario,
+          precio_unitario: line.precio_unitario,
+          total,
+          ganancia,
+        };
+      });
+      const { error: iErr } = await supabase.from(LIN).insert(lineRows);
+      if (iErr) throw iErr;
+    } catch (e) {
+      await applyRenashopStockDelta(newStock, oldStock).catch(() => {});
+      throw e;
+    }
 
     const full = await this.getById(ventaId);
     if (!full) throw new Error("No se pudo cargar la venta actualizada");
@@ -273,8 +298,21 @@ export const ventasRenashopService = {
   },
 
   async eliminar(id: string): Promise<void> {
-    const { error } = await supabase.from(CAB).delete().eq("id", id);
-    if (error) throw error;
+    const prev = await this.getById(id);
+    if (!prev) throw new Error("Venta no encontrada");
+    const lineasStock = prev.lineas.map((l) => ({
+      producto_id: l.producto_id,
+      cantidad: l.cantidad,
+    }));
+
+    await applyRenashopStockDelta(lineasStock, []);
+    try {
+      const { error } = await supabase.from(CAB).delete().eq("id", id);
+      if (error) throw error;
+    } catch (e) {
+      await applyRenashopStockDelta([], lineasStock).catch(() => {});
+      throw e;
+    }
   },
 
   async getResumenHoy(): Promise<{ totalVentas: number; cantidadVentas: number }> {

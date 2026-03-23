@@ -2,7 +2,7 @@
 
 ## Requisitos
 
-1. Aplicar la migración `011_notificaciones_y_config.sql` en el proyecto Supabase (`supabase db push` o SQL Editor).
+1. Aplicar las migraciones de notificaciones en el proyecto Supabase (`supabase db push` o SQL Editor), incluyendo `011_notificaciones_y_config.sql` y `017_fn_salida_alquiler_semana_lima.sql`.
 2. Desplegar las Edge Functions:
 
 ```bash
@@ -19,7 +19,7 @@ En **Project Settings → Edge Functions → Schedules** (o **Integrations → C
 | Función             | Expresión cron (UTC) | Efecto aproximado (Lima, UTC-5)        |
 |---------------------|----------------------|----------------------------------------|
 | `notify-birthdays`  | `0 11 * * *`         | Todos los días **06:00** hora Lima     |
-| `notify-rent-alert` | `0 * * * *`          | La función corre cada hora pero **solo envía** en franjas Lima: jueves **20:00**, viernes/sábado/domingo **06:00 y 20:00**, si saldo del mes &lt; cuota. |
+| `notify-rent-alert` | `0 * * * *`          | La función corre cada hora pero **solo envía** en franjas Lima: jueves **20:00**, viernes/sábado/domingo **06:00 y 20:00**, si saldo del mes &lt; cuota **y** no hay ya una **salida** en finanzas con categoría **Alquiler** en la **semana en curso** (lunes–domingo, fecha Lima). |
 
 > Perú no usa horario de verano; 11:00 UTC = 06:00 Lima de forma estable.
 
@@ -41,6 +41,7 @@ Se registra deduplicación por destinatario en `email_logs` con `dedupe_key`.
 
 - **Cuota alquiler:** tabla `app_config`, clave `cuota_alquiler` (editable en **Configuración** del ERP).
 - **Saldo:** función SQL `fn_saldo_mes_actual_lima()` (misma lógica que el balance mensual en la app).
+- **Excepción alquiler:** función `fn_hay_salida_alquiler_semana_actual_lima()` — si devuelve `true`, no se crea notificación ni email de cuota esa semana.
 - **Notificaciones:** tabla `notificaciones`; lectura por usuario en `notificacion_lecturas`.
 
 ## Prueba manual

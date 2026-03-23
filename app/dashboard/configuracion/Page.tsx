@@ -358,9 +358,11 @@ export default function ConfiguracionPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-gray-600">
-            <strong>Cuota de alquiler (S/)</strong> se usa para las notificaciones automáticas los{" "}
-            <strong>jueves desde las 16:00</strong> (hora Lima): si el saldo del mes es menor que esta
-            cuota, se registra una alerta cada hora. Valor por defecto: 275.
+            <strong>Cuota de alquiler (S/)</strong> se usa para las alertas automáticas (hora Lima: jueves
+            20:00; viernes a domingo 06:00 y 20:00): si el saldo del mes es menor que esta cuota, se envía
+            alerta — salvo que en la <strong>semana en curso</strong> (lunes a domingo) ya exista una{" "}
+            <strong>salida</strong> en Finanzas con categoría <strong>Alquiler</strong>. Valor por defecto:
+            275.
           </p>
           <div className="flex flex-wrap items-end gap-3">
             <div>
