@@ -34,6 +34,22 @@ export interface TransaccionInput {
   notas?: string;
 }
 
+/** Categoría de entradas creada al sincronizar ventas Renashop → Finanzas */
+export const CATEGORIA_ENTRADA_RENASHOP = "Venta Renashop";
+
+const RENASHOP_SYNC_NOTAS_MARK = "renashop_sync:";
+
+/**
+ * Entrada del mes contada como Renashop en el desglose: categoría "Venta Renashop"
+ * o notas con el marcador del sync (por si la categoría quedó vacía o manual).
+ */
+export function esEntradaRenashopEnFinanzas(t: Transaccion): boolean {
+  if (t.tipo !== "entrada") return false;
+  if (t.categoria_nombre === CATEGORIA_ENTRADA_RENASHOP) return true;
+  const notas = (t.notas ?? "").toLowerCase();
+  return notas.includes(RENASHOP_SYNC_NOTAS_MARK);
+}
+
 export interface BalanceMensual {
   mes: string;
   entradas: Transaccion[];
@@ -42,6 +58,22 @@ export interface BalanceMensual {
   totalSalidas: number;
   saldo: number;
   fondoAnterior: number;
+  /**
+   * Entradas del mes que no son sync Renashop (ni categoría ni notas renashop_sync:).
+   * No incluye fondo anterior.
+   */
+  entradasMesSinRenashop: number;
+  /**
+   * Suma de montos de entradas Renashop en Finanzas (sync) en el mes.
+   */
+  entradasMesRenashopBruto: number;
+  /**
+   * Parte de capital/costo: por cada sync, monto de la entrada menos la ganancia
+   * de ventas Renashop de esa fecha (total − ganancia).
+   */
+  entradasMesRenashopCapital: number;
+  /** Ganancia Renashop asociada a esas entradas (bruto − capital). */
+  entradasMesRenashopGanancia: number;
 }
 
 function firstDayOfMonth(year: number, month: number): string {
@@ -51,6 +83,39 @@ function firstDayOfMonth(year: number, month: number): string {
 function lastDayOfMonth(year: number, month: number): string {
   const last = new Date(year, month, 0).getDate();
   return `${year}-${String(month).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
+}
+
+/** Suma ganancia por fecha (YYYY-MM-DD) según ventas Renashop del período. */
+async function getGananciaRenashopPorFecha(
+  from: string,
+  to: string
+): Promise<Record<string, number>> {
+  const { data: cabs, error: cabsErr } = await supabase
+    .from("ventas_renashop_cabeceras")
+    .select("id, fecha")
+    .gte("fecha", from)
+    .lte("fecha", to);
+  if (cabsErr) throw cabsErr;
+  if (!cabs?.length) return {};
+
+  const ids = cabs.map((c: { id: string }) => c.id);
+  const { data: lines, error: linesErr } = await supabase
+    .from("ventas_renashop_lineas")
+    .select("venta_id, ganancia")
+    .in("venta_id", ids);
+  if (linesErr) throw linesErr;
+
+  const ventaIdToFecha = Object.fromEntries(
+    cabs.map((c: { id: string; fecha: string }) => [c.id, c.fecha])
+  );
+  const gananciaPorFecha: Record<string, number> = {};
+  for (const row of lines ?? []) {
+    const f = ventaIdToFecha[(row as { venta_id: string }).venta_id];
+    if (!f) continue;
+    const g = Number((row as { ganancia: unknown }).ganancia);
+    gananciaPorFecha[f] = (gananciaPorFecha[f] ?? 0) + (Number.isFinite(g) ? g : 0);
+  }
+  return gananciaPorFecha;
 }
 
 export const finanzasService = {
@@ -100,6 +165,28 @@ export const finanzasService = {
 
     const fondoAnterior = await this.getFondoAnterior(year, month);
 
+    const gananciaPorFecha = await getGananciaRenashopPorFecha(from, to);
+
+    let entradasMesSinRenashop = 0;
+    let entradasMesRenashopBruto = 0;
+    let entradasMesRenashopCapital = 0;
+
+    for (const t of entradas) {
+      const esRenashop = esEntradaRenashopEnFinanzas(t);
+      if (!esRenashop) {
+        entradasMesSinRenashop += t.monto;
+        continue;
+      }
+      entradasMesRenashopBruto += t.monto;
+      const gananciaDia = gananciaPorFecha[t.fecha] ?? 0;
+      entradasMesRenashopCapital += Math.max(0, t.monto - gananciaDia);
+    }
+
+    const entradasMesRenashopGanancia = Math.max(
+      0,
+      entradasMesRenashopBruto - entradasMesRenashopCapital
+    );
+
     return {
       mes: `${year}-${String(month).padStart(2, "0")}`,
       entradas,
@@ -108,6 +195,10 @@ export const finanzasService = {
       totalSalidas,
       saldo: totalEntradas + fondoAnterior - totalSalidas,
       fondoAnterior,
+      entradasMesSinRenashop,
+      entradasMesRenashopBruto,
+      entradasMesRenashopCapital,
+      entradasMesRenashopGanancia,
     };
   },
 
@@ -276,7 +367,7 @@ export const finanzasService = {
     fecha: string,
     options?: { sobrescribirDuplicado?: boolean }
   ): Promise<{ monto: number; transaccion: Transaccion }> {
-    const marker = `renashop_sync:${fecha}`;
+    const marker = `${RENASHOP_SYNC_NOTAS_MARK}${fecha}`;
     const sobrescribirDuplicado = options?.sobrescribirDuplicado === true;
 
     if (!sobrescribirDuplicado) {
@@ -317,7 +408,7 @@ export const finanzasService = {
       .from("categorias_finanzas")
       .select("id")
       .eq("tipo", "entrada")
-      .eq("nombre", "Venta Renashop")
+      .eq("nombre", CATEGORIA_ENTRADA_RENASHOP)
       .limit(1)
       .maybeSingle();
     if (catErr) throw catErr;

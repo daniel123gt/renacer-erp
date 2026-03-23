@@ -27,7 +27,6 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
 import {
-  DollarSign,
   TrendingUp,
   TrendingDown,
   Plus,
@@ -46,6 +45,7 @@ import {
   type Transaccion,
 } from "~/services/finanzasService";
 import { AddTransaccionModal } from "~/components/ui/add-transaccion-modal";
+import { SaldoDesgloseCard } from "~/components/ui/saldo-desglose-card";
 import { getAppName } from "~/lib/erpBranding";
 
 const MESES = [
@@ -371,19 +371,7 @@ export default function FinanzasPage() {
               </CardContent>
             </Card>
 
-            <Card className={balance.saldo >= 0 ? "bg-primary-blue/5 border-primary-blue/20" : "bg-orange-50 border-orange-200"}>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Saldo Actual</p>
-                    <p className={`text-2xl font-bold ${balance.saldo >= 0 ? "text-primary-blue" : "text-orange-700"}`}>
-                      S/ {formatMoney(balance.saldo)}
-                    </p>
-                  </div>
-                  <DollarSign className={`w-8 h-8 ${balance.saldo >= 0 ? "text-primary-blue" : "text-orange-500"}`} />
-                </div>
-              </CardContent>
-            </Card>
+            <SaldoDesgloseCard balance={balance} formatMoney={formatMoney} variant="default" />
           </div>
 
           {/* Tabla de balance tipo Excel */}

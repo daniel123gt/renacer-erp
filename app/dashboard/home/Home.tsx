@@ -9,12 +9,12 @@ import {
   Wallet,
   TrendingUp,
   TrendingDown,
-  DollarSign,
   Loader2,
   Store,
 } from "lucide-react";
 import { getAppName } from "~/lib/erpBranding";
 import { finanzasService, type BalanceMensual } from "~/services/finanzasService";
+import { SaldoDesgloseCard } from "~/components/ui/saldo-desglose-card";
 import { personasService, type Persona } from "~/services/personasService";
 import { BirthdayCalendar } from "~/components/ui/birthday-calendar";
 
@@ -181,19 +181,7 @@ export default function HomeDashboard() {
                 </div>
               </CardContent>
             </Card>
-            <Card className={balance.saldo >= 0 ? "bg-primary-blue/5 border-primary-blue/20" : "bg-orange-50 border-orange-200"}>
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-600">Saldo Actual</p>
-                    <p className={`text-xl font-bold mt-1 ${balance.saldo >= 0 ? "text-primary-blue" : "text-orange-700"}`}>
-                      S/ {formatMoney(balance.saldo)}
-                    </p>
-                  </div>
-                  <DollarSign className={`w-7 h-7 ${balance.saldo >= 0 ? "text-primary-blue" : "text-orange-500"}`} />
-                </div>
-              </CardContent>
-            </Card>
+            <SaldoDesgloseCard balance={balance} formatMoney={formatMoney} variant="compact" />
           </div>
         ) : (
           <Card>
