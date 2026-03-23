@@ -17,7 +17,7 @@ import {
 } from "~/components/ui/select";
 import { Combobox } from "~/components/ui/combobox";
 import { toast } from "sonner";
-import { Loader2, Minus, Plus, Trash2, Package, Banknote, Ellipsis } from "lucide-react";
+import { Loader2, Minus, Plus, Trash2, Package, Banknote, Ellipsis, ArrowLeft } from "lucide-react";
 import {
   ventasRenashopService,
   type VentaRenashop,
@@ -111,7 +111,8 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
   const [cart, setCart] = useState<CartLine[]>([]);
   const [pickerValue, setPickerValue] = useState("");
 
-  const [paymentPickOpen, setPaymentPickOpen] = useState(false);
+  /** Solo venta nueva: paso 1 = datos, paso 2 = método de pago (mismo modal, sin submodal) */
+  const [registerStep, setRegisterStep] = useState<"datos" | "pago">("datos");
   const [pickedMetodo, setPickedMetodo] = useState<MetodoTarjeta>("plin");
 
   const isEditing = !!editData;
@@ -128,7 +129,7 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
   useEffect(() => {
     if (open) {
       inventoryService.list().then(setProductos).catch(() => {});
-      setPaymentPickOpen(false);
+      setRegisterStep("datos");
       if (editData) {
         setFecha(editData.fecha);
         const m = (editData.metodo_pago ?? "plin").toLowerCase();
@@ -239,12 +240,14 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
     return true;
   };
 
-  const openPaymentPicker = () => {
+  const goToPaymentStep = () => {
     if (!validateCartForSave(cart, false)) return;
     if (!validateNombre()) return;
     setPickedMetodo(estadoPago === "pendiente" ? "otro" : "plin");
-    setPaymentPickOpen(true);
+    setRegisterStep("pago");
   };
+
+  const goBackToDatosStep = () => setRegisterStep("datos");
 
   const confirmarNuevaVenta = async () => {
     const lineasPayload = buildLineasPayload();
@@ -259,7 +262,7 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
     try {
       await ventasRenashopService.crearVenta(lineasPayload, cabecera);
       toast.success("Venta registrada");
-      setPaymentPickOpen(false);
+      setRegisterStep("datos");
       onSuccess();
       onOpenChange(false);
     } catch (err: unknown) {
@@ -297,28 +300,56 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
     }
   };
 
+  const showDatosStep = isEditing || registerStep === "datos";
+  const showPagoStep = !isEditing && registerStep === "pago";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        fullScreenOnMobile
         className={cn(
-          "relative w-[95vw] max-w-[95vw] max-h-[92vh] overflow-y-auto sm:max-w-[min(96vw,720px)]",
-          "top-[50%] translate-y-[-50%] p-4 sm:p-6",
-          "max-sm:inset-0 max-sm:top-0 max-sm:left-0 max-sm:right-0 max-sm:bottom-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-full max-sm:max-w-full",
-          "max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
-          "max-sm:!flex max-sm:flex-col max-sm:items-stretch max-sm:justify-start max-sm:content-start max-sm:!gap-0 max-sm:p-3 max-sm:pt-3 max-sm:pb-4"
+          /* Nunca uses `relative` aquí: anula `fixed` del Dialog y rompe el fullscreen en móvil */
+          "w-full sm:max-w-[min(96vw,720px)] sm:p-6",
+          "flex flex-col min-h-0"
         )}
       >
-        <DialogHeader className="max-sm:shrink-0 max-sm:space-y-0 max-sm:p-0 max-sm:mx-0 max-sm:mt-0 max-sm:text-left max-sm:mb-5">
-          <DialogTitle className="text-xl max-sm:text-lg max-sm:leading-tight max-sm:pr-10 max-sm:!mb-0 max-sm:!mt-0">
-            {isEditing ? "Editar venta" : "Registrar venta"}
-          </DialogTitle>
+        <DialogHeader className="shrink-0 space-y-0 text-left px-4 pt-14 pb-2 sm:px-0 sm:pt-0 sm:pb-0 sm:mb-0 max-sm:mb-2">
+          <div className="flex items-center gap-2 pr-8 sm:pr-0">
+            {showPagoStep && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0 h-9 w-9 -ml-2"
+                onClick={goBackToDatosStep}
+                aria-label="Volver al formulario"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            )}
+            <DialogTitle className="text-left text-xl max-sm:text-lg max-sm:leading-tight flex-1">
+              {isEditing
+                ? "Editar venta"
+                : showPagoStep
+                  ? "Método de pago"
+                  : "Registrar venta"}
+            </DialogTitle>
+          </div>
+          {showPagoStep && (
+            <p className="text-sm text-muted-foreground font-normal pl-0 sm:pl-0 pt-1">
+              Paso 2 de 2 · Elige cómo se registró el cobro
+            </p>
+          )}
         </DialogHeader>
+
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          {showDatosStep && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
             if (isEditing) void handleSubmitEdit(e);
           }}
-          className="min-h-0 space-y-4 max-sm:mt-0 max-sm:flex-1 max-sm:space-y-3 max-sm:overflow-y-auto"
+          className="flex flex-col flex-1 min-h-0 space-y-4 px-4 pb-6 max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:space-y-3 sm:px-0 sm:pb-0"
         >
           <div
             className={cn(
@@ -538,97 +569,85 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
                 type="button"
                 disabled={loading}
                 className="bg-amber-500 hover:bg-amber-600"
-                onClick={openPaymentPicker}
+                onClick={goToPaymentStep}
               >
-                Registrar venta
+                Continuar
               </Button>
             )}
           </div>
         </form>
+          )}
 
-        {/* Paso: elegir método de pago (solo venta nueva) */}
-        {paymentPickOpen && !isEditing && (
-          <div
-            className="absolute inset-0 z-[80] flex items-center justify-center bg-black/50 p-3 sm:p-6 rounded-lg max-sm:rounded-none"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="payment-pick-title"
-          >
-            <div className="w-full max-w-md rounded-xl bg-white shadow-xl border p-4 sm:p-5 space-y-4 max-h-[min(90vh,520px)] overflow-y-auto">
-              <h3 id="payment-pick-title" className="text-lg font-semibold text-center">
-                ¿Cómo se pagó?
-              </h3>
-              <p className="text-sm text-muted-foreground text-center">
-                Elige el método. Si el pago está pendiente, &quot;Otro&quot; viene sugerido.
-              </p>
+          {showPagoStep && (
+            <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 space-y-4 pb-2">
+                <p className="text-sm text-muted-foreground text-center">
+                  Si el pago estaba pendiente, &quot;Otro&quot; suele ser la opción indicada.
+                </p>
 
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setPickedMetodo("plin")}
-                  className={cn(
-                    "w-full rounded-xl border-2 p-3 text-left transition-all hover:bg-amber-50/80",
-                    pickedMetodo === "plin"
-                      ? "border-amber-500 ring-2 ring-amber-400/50 bg-amber-50/50"
-                      : "border-gray-200"
-                  )}
-                >
-                  <span className="text-sm font-semibold block mb-2">Plin</span>
-                  <div className="h-24 w-full rounded-lg overflow-hidden bg-gray-100 border">
-                    <img
-                      src="/plin.jpg"
-                      alt="Plin"
-                      className="h-full w-full object-cover object-right"
-                    />
-                  </div>
-                </button>
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setPickedMetodo("plin")}
+                    className={cn(
+                      "w-full rounded-xl border-2 p-3 text-left transition-all hover:bg-amber-50/80",
+                      pickedMetodo === "plin"
+                        ? "border-amber-500 ring-2 ring-amber-400/50 bg-amber-50/50"
+                        : "border-gray-200"
+                    )}
+                  >
+                    <span className="text-sm font-semibold block mb-2">Plin</span>
+                    <div className="h-20 sm:h-24 w-full rounded-lg overflow-hidden bg-gray-100 border">
+                      <img
+                        src="/plin.jpg"
+                        alt="Plin"
+                        className="h-full w-full object-cover object-right"
+                      />
+                    </div>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setPickedMetodo("efectivo")}
-                  className={cn(
-                    "w-full rounded-xl border-2 p-4 flex items-center gap-4 transition-all hover:bg-emerald-50/80",
-                    pickedMetodo === "efectivo"
-                      ? "border-emerald-500 ring-2 ring-emerald-400/50 bg-emerald-50/40"
-                      : "border-gray-200"
-                  )}
-                >
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
-                    <Banknote className="h-9 w-9" strokeWidth={1.5} />
-                  </div>
-                  <div>
-                    <span className="font-semibold block">Efectivo</span>
-                    <span className="text-sm text-muted-foreground">Pago en billetes o monedas</span>
-                  </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setPickedMetodo("efectivo")}
+                    className={cn(
+                      "w-full rounded-xl border-2 p-4 flex items-center gap-4 transition-all hover:bg-emerald-50/80",
+                      pickedMetodo === "efectivo"
+                        ? "border-emerald-500 ring-2 ring-emerald-400/50 bg-emerald-50/40"
+                        : "border-gray-200"
+                    )}
+                  >
+                    <div className="flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
+                      <Banknote className="h-8 w-8 sm:h-9 sm:w-9" strokeWidth={1.5} />
+                    </div>
+                    <div>
+                      <span className="font-semibold block">Efectivo</span>
+                      <span className="text-sm text-muted-foreground">Pago en billetes o monedas</span>
+                    </div>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setPickedMetodo("otro")}
-                  className={cn(
-                    "w-full rounded-xl border-2 p-4 flex items-center gap-4 transition-all hover:bg-slate-50",
-                    pickedMetodo === "otro"
-                      ? "border-slate-600 ring-2 ring-slate-400/40 bg-slate-50"
-                      : "border-gray-200"
-                  )}
-                >
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-                    <Ellipsis className="h-9 w-9" strokeWidth={2} />
-                  </div>
-                  <div>
-                    <span className="font-semibold block">Otro</span>
-                    <span className="text-sm text-muted-foreground">Otro medio</span>
-                  </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setPickedMetodo("otro")}
+                    className={cn(
+                      "w-full rounded-xl border-2 p-4 flex items-center gap-4 transition-all hover:bg-slate-50",
+                      pickedMetodo === "otro"
+                        ? "border-slate-600 ring-2 ring-slate-400/40 bg-slate-50"
+                        : "border-gray-200"
+                    )}
+                  >
+                    <div className="flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                      <Ellipsis className="h-8 w-8 sm:h-9 sm:w-9" strokeWidth={2} />
+                    </div>
+                    <div>
+                      <span className="font-semibold block">Otro</span>
+                      <span className="text-sm text-muted-foreground">Transferencia, Yape, etc.</span>
+                    </div>
+                  </button>
+                </div>
               </div>
 
-              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setPaymentPickOpen(false)}
-                  disabled={loading}
-                >
+              <div className="shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t bg-background">
+                <Button type="button" variant="outline" onClick={goBackToDatosStep} disabled={loading}>
                   Volver
                 </Button>
                 <Button
@@ -642,8 +661,8 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
                 </Button>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
