@@ -29,6 +29,7 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
   SidebarFooter,
+  useSidebar,
 } from "~/components/ui/sidebar";
 import { logout } from "~/services/authService";
 import { useAuthStore } from "~/store/authStore";
@@ -109,6 +110,11 @@ export function AppSidebar() {
   const { logout: logoutUser, user } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const closeMobileMenu = () => {
+    if (isMobile) setOpenMobile(false);
+  };
   const [openSection, setOpenSection] = useState<string | null>(() =>
     getOpenSectionForPath(location.pathname, items)
   );
@@ -124,6 +130,7 @@ export function AppSidebar() {
   };
 
   const handleLogout = async () => {
+    closeMobileMenu();
     try {
       await logout();
     } catch {
@@ -186,7 +193,7 @@ export function AppSidebar() {
                         size="lg"
                         asChild
                       >
-                        <Link to={item.url}>
+                        <Link to={item.url} onClick={closeMobileMenu}>
                           <item.icon color={isActive(item.url) ? "#abd9cd" : "white"} />
                           <span className={cn(isActive(item.url) ? "text-accent-blue" : "")}>
                             {item.title}
@@ -206,6 +213,7 @@ export function AppSidebar() {
                       <div className="flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none hover:bg-white/10 [&>span:last-child]:truncate">
                         <Link
                           to={item.url}
+                          onClick={closeMobileMenu}
                           className={cn(
                             "flex min-w-0 flex-1 items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/50",
                             "text-base hover:text-accent-blue cursor-pointer",
@@ -242,7 +250,9 @@ export function AppSidebar() {
                                     : "text-white/90 hover:text-accent-blue"
                                 }
                               >
-                                <Link to={sub.url}>{sub.title}</Link>
+                                <Link to={sub.url} onClick={closeMobileMenu}>
+                                  {sub.title}
+                                </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           ))}

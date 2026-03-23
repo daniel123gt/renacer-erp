@@ -235,7 +235,10 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
       <DialogContent
         className={cn(
           "w-[95vw] max-w-[95vw] max-h-[92vh] overflow-y-auto sm:max-w-[min(96vw,720px)]",
-          "top-[50%] translate-y-[-50%] p-4 sm:p-6"
+          "top-[50%] translate-y-[-50%] p-4 sm:p-6",
+          /* Móvil: modal a pantalla completa */
+          "max-sm:inset-0 max-sm:top-0 max-sm:left-0 max-sm:right-0 max-sm:bottom-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-full max-sm:max-w-full",
+          "max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0"
         )}
       >
         <DialogHeader>
@@ -310,7 +313,7 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
                 Busca en el inventario y añade productos al carrito
               </div>
             ) : (
-              <ul className="space-y-2 max-h-[min(40vh,320px)] overflow-y-auto pr-1">
+              <ul className="space-y-2 max-h-[min(40vh,320px)] max-sm:max-h-[min(52vh,420px)] overflow-y-auto pr-1">
                 {cart.map((line) => {
                   const sub = line.cantidad * line.precio_unitario;
                   return (

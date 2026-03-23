@@ -530,7 +530,7 @@ export default function VentasPage() {
                                 )}
                               </TableCell>
                               <TableCell className="text-right">
-                                <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex gap-1 justify-end">
                                   <Button variant="ghost" size="sm" onClick={() => openEdit(v)}>
                                     <Edit className="w-3.5 h-3.5" />
                                   </Button>

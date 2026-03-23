@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -16,7 +16,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { useAuthStore } from "~/store/authStore";
 import supabase from "~/utils/supabase";
-import { Loader2, User, Phone, Calendar, Hash, Mail } from "lucide-react";
+import { Loader2, User, Phone, Calendar, Hash, Mail, KeyRound } from "lucide-react";
+import { changePasswordWithCurrent } from "~/services/authService";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 
 const formSchema = z.object({
   full_name: z.string().min(1, "El nombre es obligatorio"),
@@ -25,14 +34,43 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+const passwordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Ingresa tu contraseña actual"),
+    newPassword: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+    confirmPassword: z.string().min(1, "Confirma la contraseña"),
+  })
+  .refine((v) => v.newPassword === v.confirmPassword, {
+    message: "Las contraseñas no coinciden",
+    path: ["confirmPassword"],
+  })
+  .refine((v) => v.newPassword !== v.currentPassword, {
+    message: "La nueva contraseña debe ser distinta a la actual",
+    path: ["newPassword"],
+  });
+
+type PasswordFormValues = z.infer<typeof passwordSchema>;
+
 export default function MiPerfilPage() {
   const { user, login } = useAuthStore();
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [passwordActionLoading, setPasswordActionLoading] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       full_name: "",
       phone: "",
+    },
+  });
+
+  const passwordForm = useForm<PasswordFormValues>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
     },
   });
 
@@ -44,6 +82,16 @@ export default function MiPerfilPage() {
       });
     }
   }, [user, form.reset]);
+
+  const resetPasswordFlow = () => {
+    passwordForm.reset({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+    setConfirmModalOpen(false);
+    setPasswordModalOpen(false);
+  };
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -72,6 +120,52 @@ export default function MiPerfilPage() {
       toast.success("Perfil actualizado correctamente");
     } catch {
       toast.error("Error al actualizar el perfil");
+    }
+  };
+
+  /** Valida el formulario y abre el modal de confirmación */
+  const openConfirmChangePassword = () => {
+    void passwordForm.handleSubmit(() => setConfirmModalOpen(true))();
+  };
+
+  const executePasswordChange = async () => {
+    const values = passwordForm.getValues();
+    const email = user?.email;
+    if (!email) {
+      toast.error("No hay correo en la sesión");
+      return;
+    }
+
+    setPasswordActionLoading(true);
+    try {
+      const { data, error } = await changePasswordWithCurrent(
+        email,
+        values.currentPassword,
+        values.newPassword
+      );
+      if (error) {
+        toast.error(
+          typeof error === "object" && error !== null && "message" in error
+            ? String((error as { message: string }).message)
+            : "No se pudo cambiar la contraseña"
+        );
+        return;
+      }
+      if (data?.user) {
+        login({
+          id: data.user.id,
+          email: data.user.email ?? user?.email ?? "",
+          user_metadata: data.user.user_metadata ?? {},
+          created_at: data.user.created_at ?? user?.created_at ?? "",
+          updated_at: data.user.updated_at ?? data.user.created_at ?? user?.updated_at ?? "",
+        });
+      }
+      toast.success("Contraseña actualizada correctamente");
+      resetPasswordFlow();
+    } catch {
+      toast.error("Error al cambiar la contraseña");
+    } finally {
+      setPasswordActionLoading(false);
     }
   };
 
@@ -150,6 +244,166 @@ export default function MiPerfilPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-primary-blue flex items-center gap-2">
+            <KeyRound className="w-5 h-5" />
+            Contraseña
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-gray-600">
+            Actualiza tu contraseña de acceso. Se pedirá la contraseña actual y una confirmación
+            antes de aplicar el cambio.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-primary-blue text-primary-blue hover:bg-primary-blue/10"
+            onClick={() => {
+              passwordForm.reset();
+              setPasswordModalOpen(true);
+            }}
+          >
+            <KeyRound className="w-4 h-4 mr-2" />
+            Cambiar contraseña
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Modal: datos del cambio */}
+      <Dialog
+        open={passwordModalOpen}
+        onOpenChange={(open) => {
+          setPasswordModalOpen(open);
+          if (!open) {
+            setConfirmModalOpen(false);
+            passwordForm.reset();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cambiar contraseña</DialogTitle>
+            <DialogDescription>
+              Escribe tu contraseña actual y la nueva contraseña que deseas usar.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...passwordForm}>
+            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+              <FormField
+                control={passwordForm.control}
+                name="currentPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contraseña actual</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        autoComplete="current-password"
+                        placeholder="••••••••"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={passwordForm.control}
+                name="newPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nueva contraseña</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="••••••••"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={passwordForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmar nueva contraseña</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="••••••••"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
+          </Form>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPasswordModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              className="bg-primary-blue hover:bg-primary-blue/90"
+              onClick={openConfirmChangePassword}
+            >
+              Continuar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: confirmación */}
+      <Dialog open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>¿Confirmar cambio?</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de actualizar tu contraseña? Tendrás que usar la nueva contraseña la
+              próxima vez que inicies sesión.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmModalOpen(false)}
+              disabled={passwordActionLoading}
+            >
+              No, volver
+            </Button>
+            <Button
+              type="button"
+              className="bg-primary-blue hover:bg-primary-blue/90"
+              onClick={() => void executePasswordChange()}
+              disabled={passwordActionLoading}
+            >
+              {passwordActionLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Actualizando...
+                </>
+              ) : (
+                "Sí, actualizar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card className="bg-gray-50 border-gray-200">
         <CardHeader>
           <CardTitle className="text-gray-700 text-base">Datos de la cuenta</CardTitle>
@@ -161,7 +415,16 @@ export default function MiPerfilPage() {
           </div>
           <div className="flex items-center gap-3">
             <Calendar className="w-4 h-4 text-primary-blue" />
-            <span>Fecha de ingreso: {user.created_at ? new Date(user.created_at).toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric" }) : "—"}</span>
+            <span>
+              Fecha de ingreso:{" "}
+              {user.created_at
+                ? new Date(user.created_at).toLocaleDateString("es-ES", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                : "—"}
+            </span>
           </div>
           <div className="flex items-center gap-3">
             <Hash className="w-4 h-4 text-primary-blue" />
