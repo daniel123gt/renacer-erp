@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type AppRole = "admin" | "gestor";
+export type AppRole = "admin" | "gestor" | "vendedor";
 
 export interface User {
   id: string;
@@ -18,9 +18,16 @@ export interface User {
 /** Rol del usuario en el ERP. Por defecto "admin" si no viene en user_metadata. */
 export function getAppRole(user: User | null): AppRole {
   const role = user?.user_metadata?.role;
-  if (role === "gestor" || role === "admin") return role;
+  if (role === "gestor" || role === "admin" || role === "vendedor") return role;
   return "admin";
 }
+
+/** Solo Renashop → Ventas; asignar `user_metadata.role = "vendedor"` en Supabase Auth. */
+export function isVendedor(user: User | null): boolean {
+  return getAppRole(user) === "vendedor";
+}
+
+export const VENDEDOR_VENTAS_PATH = "/renashop/ventas";
 
 interface AuthState {
   user: User | null;

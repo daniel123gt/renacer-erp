@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { SidebarProvider, useSidebar } from "~/components/ui/sidebar";
 import { AppSidebar } from "~/components/ui/app-sidebar";
 import { RightSidebar } from "~/components/ui/right-sidebar";
-import { useAuthStore } from "~/store/authStore";
-import { Navigate, Outlet, useNavigate } from "react-router";
+import { useAuthStore, isVendedor } from "~/store/authStore";
+import { shouldRedirectVendedorAway, VENDEDOR_VENTAS_PATH } from "~/lib/vendedorAccess";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { FullPageLoader } from "~/components/FullPageLoader";
 import { getPrimaryColor } from "~/lib/erpBranding";
 import { Menu } from "lucide-react";
@@ -31,6 +32,7 @@ const SESSION_CHECK_TIMEOUT_MS = 30_000;
 export default function Layout() {
   const { user, hasHydrated, logout: logoutUser, login } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [checkingSession, setCheckingSession] = useState(true);
 
   // Importante: depender de user?.id, no de `user` entero. Cada login() sustituye el
@@ -135,6 +137,12 @@ export default function Layout() {
     return <FullPageLoader label="Verificando sesión…" />;
   }
 
+  if (user && shouldRedirectVendedorAway(user, location.pathname)) {
+    return <Navigate to={VENDEDOR_VENTAS_PATH} replace />;
+  }
+
+  const hideHeaderWidgets = user ? isVendedor(user) : false;
+
   return (
     <SidebarProvider style={{
         "--sidebar-width": "17rem",
@@ -149,8 +157,12 @@ export default function Layout() {
             </div>
             <div className="flex-1 min-w-0" aria-hidden />
             <div className="flex items-center gap-0.5 shrink-0">
-              <InventoryStockAlerts />
-              <NotificationBell />
+              {!hideHeaderWidgets && (
+                <>
+                  <InventoryStockAlerts />
+                  <NotificationBell />
+                </>
+              )}
             </div>
           </div>
           <Outlet />

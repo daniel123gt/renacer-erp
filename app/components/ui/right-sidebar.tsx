@@ -1,4 +1,4 @@
-import { useAuthStore, getAppRole } from "~/store/authStore";
+import { useAuthStore, getAppRole, isVendedor } from "~/store/authStore";
 import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
@@ -9,6 +9,10 @@ export function RightSidebar() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const role = getAppRole(user);
+
+  if (user && isVendedor(user)) {
+    return null;
+  }
   const fullName = user?.user_metadata?.full_name || "Usuario";
   const email = user?.email || "";
   const createdAt = user?.created_at

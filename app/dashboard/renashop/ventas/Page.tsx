@@ -55,6 +55,7 @@ import {
   resumenProductosVenta,
 } from "~/services/ventasRenashopService";
 import { AddVentaModal } from "~/components/ui/add-venta-modal";
+import { useAuthStore, isVendedor } from "~/store/authStore";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -67,7 +68,14 @@ function formatMoney(n: number): string {
   return n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** Columnas de la tabla principal (sin contar la celda de expand). */
+function mainTableColCount(vendedor: boolean): number {
+  return vendedor ? 9 : 10;
+}
+
 export default function VentasPage() {
+  const { user } = useAuthStore();
+  const vendedor = isVendedor(user);
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -154,6 +162,10 @@ export default function VentasPage() {
 
   const [tendencia, setTendencia] = useState<{ mes: string; total: number }[]>([]);
   useEffect(() => {
+    if (vendedor) {
+      setTendencia([]);
+      return;
+    }
     const fetchTendencia = async () => {
       const result: { mes: string; total: number }[] = [];
       for (let i = 5; i >= 0; i--) {
@@ -169,8 +181,8 @@ export default function VentasPage() {
       }
       setTendencia(result);
     };
-    fetchTendencia();
-  }, [year, month]);
+    void fetchTendencia();
+  }, [year, month, vendedor]);
 
   const openAdd = () => { setEditingVenta(null); setModalOpen(true); };
   const openEdit = (v: VentaRenashop) => { setEditingVenta(v); setModalOpen(true); };
@@ -193,24 +205,37 @@ export default function VentasPage() {
   };
 
   const handleExportCSV = () => {
-    const headers =
-      "Id venta,Fecha,Nombre,Producto,Cantidad,Costo Unit. (S/),P. Venta Unit. (S/),Total línea (S/),Ganancia línea (S/),Método de pago,Estado pago\n";
+    const headers = vendedor
+      ? "Id venta,Fecha,Nombre,Producto,Cantidad,P. Venta Unit. (S/),Total línea (S/),Método de pago,Estado pago\n"
+      : "Id venta,Fecha,Nombre,Producto,Cantidad,Costo Unit. (S/),P. Venta Unit. (S/),Total línea (S/),Ganancia línea (S/),Método de pago,Estado pago\n";
     const rows = ventas.flatMap((v) =>
-      v.lineas.map((l) =>
-        [
+      v.lineas.map((l) => {
+        const base = [
           v.id,
           v.fecha,
           `"${(v.nombre ?? "").replace(/"/g, '""')}"`,
           `"${l.producto_nombre.replace(/"/g, '""')}"`,
           l.cantidad,
+        ];
+        if (vendedor) {
+          return [
+            ...base,
+            l.precio_unitario.toFixed(2),
+            l.total.toFixed(2),
+            v.metodo_pago ?? "",
+            v.estado_pago === "pendiente" ? "pendiente" : "pagado",
+          ].join(",");
+        }
+        return [
+          ...base,
           l.costo_unitario.toFixed(2),
           l.precio_unitario.toFixed(2),
           l.total.toFixed(2),
           l.ganancia.toFixed(2),
           v.metodo_pago ?? "",
           v.estado_pago === "pendiente" ? "pendiente" : "pagado",
-        ].join(",")
-      )
+        ].join(",");
+      })
     );
     const blob = new Blob([headers + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
@@ -231,12 +256,16 @@ export default function VentasPage() {
             <ShoppingCart className="w-7 h-7 text-amber-500" />
             Ventas — Renashop
           </h1>
-          <p className="text-gray-600 mt-1">Registro y reportes de ventas de la tienda</p>
+          <p className="text-gray-600 mt-1">
+            {vendedor ? "Registra y consulta las ventas del mes." : "Registro y reportes de ventas de la tienda"}
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={ventas.length === 0}>
-            <Download className="w-4 h-4 mr-1" /> CSV
-          </Button>
+          {!vendedor && (
+            <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={ventas.length === 0}>
+              <Download className="w-4 h-4 mr-1" /> CSV
+            </Button>
+          )}
           <Button size="sm" className="bg-amber-500 hover:bg-amber-600" onClick={openAdd}>
             <Plus className="w-4 h-4 mr-1" /> Nueva venta
           </Button>
@@ -280,6 +309,7 @@ export default function VentasPage() {
         </Card>
       ) : (
         <>
+          {!vendedor && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="bg-amber-50 border-amber-200">
               <CardContent className="pt-6">
@@ -331,7 +361,9 @@ export default function VentasPage() {
               </CardContent>
             </Card>
           </div>
+          )}
 
+          {!vendedor && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -436,6 +468,7 @@ export default function VentasPage() {
               </CardContent>
             </Card>
           </div>
+          )}
 
           <Card>
             <CardHeader>
@@ -470,7 +503,7 @@ export default function VentasPage() {
                         <TableHead>Productos</TableHead>
                         <TableHead className="text-center">Ítems</TableHead>
                         <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="text-right">Ganancia</TableHead>
+                        {!vendedor && <TableHead className="text-right">Ganancia</TableHead>}
                         <TableHead>Método</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead className="w-[90px]"></TableHead>
@@ -511,9 +544,11 @@ export default function VentasPage() {
                               <TableCell className="text-right font-semibold tabular-nums text-amber-600">
                                 S/ {formatMoney(totalVenta(v))}
                               </TableCell>
-                              <TableCell className="text-right font-semibold tabular-nums text-green-600">
-                                S/ {formatMoney(totalGananciaVenta(v))}
-                              </TableCell>
+                              {!vendedor && (
+                                <TableCell className="text-right font-semibold tabular-nums text-green-600">
+                                  S/ {formatMoney(totalGananciaVenta(v))}
+                                </TableCell>
+                              )}
                               <TableCell>
                                 {v.metodo_pago ? (
                                   <Badge variant="secondary" className="capitalize text-xs">
@@ -552,7 +587,7 @@ export default function VentasPage() {
                             </TableRow>
                             {open && (
                               <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
-                                <TableCell colSpan={10} className="p-0">
+                                <TableCell colSpan={mainTableColCount(vendedor)} className="p-0">
                                   <div className="px-4 py-3 pl-12 border-t border-gray-100">
                                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                                       Líneas del ticket
@@ -565,7 +600,7 @@ export default function VentasPage() {
                                             <th className="p-2 text-center w-16">Cant.</th>
                                             <th className="p-2 text-right">P. venta</th>
                                             <th className="p-2 text-right">Total</th>
-                                            <th className="p-2 text-right">Ganancia</th>
+                                            {!vendedor && <th className="p-2 text-right">Ganancia</th>}
                                           </tr>
                                         </thead>
                                         <tbody>
@@ -577,9 +612,11 @@ export default function VentasPage() {
                                               <td className="p-2 text-right tabular-nums text-amber-700">
                                                 S/ {formatMoney(l.total)}
                                               </td>
-                                              <td className="p-2 text-right tabular-nums text-green-700">
-                                                S/ {formatMoney(l.ganancia)}
-                                              </td>
+                                              {!vendedor && (
+                                                <td className="p-2 text-right tabular-nums text-green-700">
+                                                  S/ {formatMoney(l.ganancia)}
+                                                </td>
+                                              )}
                                             </tr>
                                           ))}
                                         </tbody>

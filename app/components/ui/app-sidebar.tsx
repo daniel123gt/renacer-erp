@@ -10,6 +10,7 @@ import {
   Store,
   Users,
   CalendarDays,
+  ShoppingCart,
 } from "lucide-react";
 
 import {
@@ -32,7 +33,7 @@ import {
   useSidebar,
 } from "~/components/ui/sidebar";
 import { logout } from "~/services/authService";
-import { useAuthStore } from "~/store/authStore";
+import { useAuthStore, getAppRole } from "~/store/authStore";
 import { useNavigate, useLocation, Link } from "react-router";
 import { toast } from "sonner";
 import { Button } from "./button";
@@ -106,23 +107,37 @@ function getOpenSectionForPath(pathname: string, visibleItems: NavItem[]): strin
   return match?.title ?? null;
 }
 
+const vendedorNavItems: NavItem[] = [
+  {
+    title: "Ventas Renashop",
+    url: "/renashop/ventas",
+    icon: ShoppingCart,
+  },
+];
+
 export function AppSidebar() {
   const { logout: logoutUser, user } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
 
+  const visibleItems = useMemo(() => {
+    if (!user) return items;
+    if (getAppRole(user) === "vendedor") return vendedorNavItems;
+    return items;
+  }, [user]);
+
   const closeMobileMenu = () => {
     if (isMobile) setOpenMobile(false);
   };
   const [openSection, setOpenSection] = useState<string | null>(() =>
-    getOpenSectionForPath(location.pathname, items)
+    getOpenSectionForPath(location.pathname, visibleItems)
   );
 
   useEffect(() => {
-    const key = getOpenSectionForPath(location.pathname, items);
+    const key = getOpenSectionForPath(location.pathname, visibleItems);
     if (key) setOpenSection(key);
-  }, [location.pathname]);
+  }, [location.pathname, visibleItems]);
 
   const isActive = (url: string) => {
     if (url === "/") return location.pathname === "/";
@@ -181,7 +196,7 @@ export function AppSidebar() {
           
           <SidebarGroupContent className="px-4">
             <SidebarMenu className="custom-scrollbar-ondemand">
-              {items.map((item) => {
+              {visibleItems.map((item) => {
                 const hasChildren = item.children && item.children.length > 0;
                 const isOpen = openSection === item.title;
 
