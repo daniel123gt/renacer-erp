@@ -70,7 +70,7 @@ export function InventoryStockAlerts() {
           variant="ghost"
           size="icon"
           className={cn(
-            "relative shrink-0 hover:bg-primary-blue/10",
+            "relative shrink-0 h-[60px] w-[60px] hover:bg-primary-blue/10",
             hasAlerts ? "text-amber-700" : "text-primary-blue/50"
           )}
           aria-label={
@@ -79,9 +79,9 @@ export function InventoryStockAlerts() {
               : "Inventario: sin alertas de stock"
           }
         >
-          <AlertTriangle className={cn("h-6 w-6", hasAlerts && "text-amber-600")} />
+          <AlertTriangle className={cn("h-10 w-10", hasAlerts && "text-amber-600")} />
           {hasAlerts && (
-            <Badge className="absolute -top-0.5 -right-0.5 h-5 min-w-5 px-1 flex items-center justify-center rounded-full bg-amber-600 text-[10px] text-white hover:bg-amber-600 border-0">
+            <Badge className="absolute -top-1.5 -right-1.5 h-6 min-w-6 px-1 flex items-center justify-center rounded-full bg-amber-600 text-[11px] text-white hover:bg-amber-600 border-0">
               {count > 99 ? "99+" : count}
             </Badge>
           )}

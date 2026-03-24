@@ -122,12 +122,12 @@ export function NotificationBell() {
           type="button"
           variant="ghost"
           size="icon"
-          className="relative shrink-0 text-primary-blue hover:bg-primary-blue/10"
+          className="relative shrink-0 h-[60px] w-[60px] text-primary-blue hover:bg-primary-blue/10"
           aria-label="Notificaciones"
         >
-          <Bell className="h-6 w-6" />
+          <Bell className="h-10 w-10" />
           {unread > 0 && (
-            <Badge className="absolute -top-0.5 -right-0.5 h-5 min-w-5 px-1 flex items-center justify-center rounded-full bg-pink-600 text-[10px] text-white hover:bg-pink-600 border-0">
+            <Badge className="absolute -top-1.5 -right-1.5 h-6 min-w-6 px-1 flex items-center justify-center rounded-full bg-pink-600 text-[11px] text-white hover:bg-pink-600 border-0">
               {unread > 99 ? "99+" : unread}
             </Badge>
           )}

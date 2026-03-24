@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { SidebarProvider, useSidebar } from "~/components/ui/sidebar";
 import { AppSidebar } from "~/components/ui/app-sidebar";
-import { RightSidebar } from "~/components/ui/right-sidebar";
+import { MobileRightSidebarButton, RightSidebar } from "~/components/ui/right-sidebar";
 import { useAuthStore, isVendedor } from "~/store/authStore";
 import { shouldRedirectVendedorAway, VENDEDOR_VENTAS_PATH } from "~/lib/vendedorAccess";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
@@ -163,6 +163,7 @@ export default function Layout() {
                   <NotificationBell />
                 </>
               )}
+              <MobileRightSidebarButton />
             </div>
           </div>
           <Outlet />

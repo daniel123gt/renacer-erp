@@ -1,18 +1,20 @@
+import { useState } from "react";
 import { useAuthStore, getAppRole, isVendedor } from "~/store/authStore";
 import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import { getAppName, getLogoPath } from "~/lib/erpBranding";
 import { Calendar, Package, Settings, User, Wallet } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "~/components/ui/sheet";
 
-export function RightSidebar() {
+type SidebarContentProps = {
+  compact?: boolean;
+  onNavigate: (path: string) => void;
+};
+
+function RightSidebarContent({ compact = false, onNavigate }: SidebarContentProps) {
   const { user } = useAuthStore();
-  const navigate = useNavigate();
   const role = getAppRole(user);
-
-  if (user && isVendedor(user)) {
-    return null;
-  }
   const fullName = user?.user_metadata?.full_name || "Usuario";
   const email = user?.email || "";
   const createdAt = user?.created_at
@@ -22,11 +24,11 @@ export function RightSidebar() {
         year: "numeric",
       })
     : null;
+  const contentPadding = compact ? "p-4" : "p-6";
 
   return (
-    <aside className="w-72 shrink-0 border-l border-gray-200 bg-white hidden lg:flex flex-col">
-      <div className="p-6 flex flex-col gap-6 flex-1 overflow-y-auto">
-        {/* Perfil del usuario */}
+    <>
+      <div className={`${contentPadding} flex flex-col gap-6 flex-1 overflow-y-auto`}>
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Perfil del Usuario
@@ -59,7 +61,7 @@ export function RightSidebar() {
             variant="outline"
             size="sm"
             className="mt-3 w-full"
-            onClick={() => navigate("/mi-perfil")}
+            onClick={() => onNavigate("/mi-perfil")}
           >
             <User className="w-4 h-4 mr-2" />
             Datos y configuración
@@ -68,17 +70,16 @@ export function RightSidebar() {
 
         <Separator />
 
-        {/* Accesos rápidos */}
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Accesos rápidos
+            Accesos rapidos
           </h3>
           <div className="space-y-2">
             <Button
               variant="ghost"
               size="sm"
               className="w-full justify-start"
-              onClick={() => navigate("/finanzas")}
+              onClick={() => onNavigate("/finanzas")}
             >
               <Wallet className="w-4 h-4 mr-2 text-primary-blue" />
               Finanzas
@@ -87,7 +88,7 @@ export function RightSidebar() {
               variant="ghost"
               size="sm"
               className="w-full justify-start"
-              onClick={() => navigate("/renashop")}
+              onClick={() => onNavigate("/renashop")}
             >
               <Package className="w-4 h-4 mr-2 text-amber-500" />
               Renashop
@@ -96,7 +97,7 @@ export function RightSidebar() {
               variant="ghost"
               size="sm"
               className="w-full justify-start"
-              onClick={() => navigate("/configuracion")}
+              onClick={() => onNavigate("/configuracion")}
             >
               <Settings className="w-4 h-4 mr-2 text-gray-600" />
               Configuración
@@ -105,8 +106,7 @@ export function RightSidebar() {
         </div>
       </div>
 
-      {/* Footer con branding */}
-      <div className="p-4 border-t border-gray-200 bg-gray-50">
+      <div className={`${compact ? "p-3" : "p-4"} border-t border-gray-200 bg-gray-50`}>
         <div className="flex items-center gap-3">
           <img
             src={getLogoPath()}
@@ -119,6 +119,60 @@ export function RightSidebar() {
           </div>
         </div>
       </div>
+    </>
+  );
+}
+
+export function MobileRightSidebarButton() {
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+
+  if (!user || isVendedor(user)) return null;
+
+  const fullName = user.user_metadata?.full_name || "Usuario";
+  const initial = (fullName.charAt(0) || user.email.charAt(0) || "U").toUpperCase();
+
+  const handleNavigate = (path: string) => {
+    setOpen(false);
+    navigate(path);
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden w-[66px] h-[66px] rounded-full border border-gray-200 bg-white hover:bg-gray-50"
+          aria-label="Abrir panel de usuario"
+        >
+          <span className="w-12 h-12 rounded-full bg-primary-blue text-white text-lg font-semibold flex items-center justify-center">
+            {initial}
+          </span>
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-[86vw] max-w-[22rem] p-0">
+        <SheetHeader className="border-b pb-3">
+          <SheetTitle>Panel de usuario</SheetTitle>
+        </SheetHeader>
+        <RightSidebarContent compact onNavigate={handleNavigate} />
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+export function RightSidebar() {
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+
+  if (user && isVendedor(user)) {
+    return null;
+  }
+
+  return (
+    <aside className="w-72 shrink-0 border-l border-gray-200 bg-white hidden lg:flex flex-col">
+      <RightSidebarContent onNavigate={navigate} />
     </aside>
   );
 }
