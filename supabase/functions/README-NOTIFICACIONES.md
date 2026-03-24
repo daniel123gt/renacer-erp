@@ -18,7 +18,7 @@ En **Project Settings → Edge Functions → Schedules** (o **Integrations → C
 
 | Función             | Expresión cron (UTC) | Efecto aproximado (Lima, UTC-5)        |
 |---------------------|----------------------|----------------------------------------|
-| `notify-birthdays`  | `0 11 * * *`         | Todos los días **06:00** hora Lima     |
+| `notify-birthdays`  | `0 11 * * *`         | Todos los días **06:00** hora Lima; envía aviso de cumpleaños de **hoy** y recordatorio de **mañana** |
 | `notify-rent-alert` | `0 * * * *`          | La función corre cada hora pero **solo envía** en franjas Lima: jueves **20:00**, viernes/sábado/domingo **06:00 y 20:00**, si saldo del mes &lt; cuota **y** no hay ya una **salida** en finanzas con categoría **Alquiler** en la **semana en curso** (lunes–domingo, fecha Lima). |
 
 > Perú no usa horario de verano; 11:00 UTC = 06:00 Lima de forma estable.

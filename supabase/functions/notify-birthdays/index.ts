@@ -1,6 +1,8 @@
 /**
  * Cron recomendado (UTC): 0 11 * * *  → ~06:00 America/Lima (sin DST en Perú)
- * Crea una notificación si hay personas activas que cumplen años ese día en Lima.
+ * Crea notificaciones de cumpleaños:
+ * - el mismo día (hoy)
+ * - un recordatorio el día anterior (mañana)
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 
@@ -70,6 +72,26 @@ function birthdayEmailHtml(bodyText: string): string {
   `;
 }
 
+function buildBirthdayCopy(nombres: string[], isTomorrow: boolean): { titulo: string; cuerpo: string } {
+  if (isTomorrow) {
+    return {
+      titulo: nombres.length === 1 ? "Cumpleaños mañana" : `Cumpleaños mañana (${nombres.length})`,
+      cuerpo:
+        nombres.length === 1
+          ? `Mañana es el cumpleaños del hermano: ${nombres[0]}.`
+          : `Mañana es el cumpleaños de los hermanos: ${nombres.join(", ")}.`,
+    };
+  }
+
+  return {
+    titulo: nombres.length === 1 ? "Cumpleaños hoy" : `Cumpleaños hoy (${nombres.length})`,
+    cuerpo:
+      nombres.length === 1
+        ? `Hoy cumple años: ${nombres[0]}.`
+        : `Hoy cumplen años: ${nombres.join(", ")}.`,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -91,96 +113,132 @@ Deno.serve(async (req) => {
     const m = row.m as number;
     const d = row.d as number;
 
-    const { data: personas, error: pErr } = await supabase
+    const todayLima = new Date(Date.UTC(y, m - 1, d));
+    const tomorrowLima = new Date(todayLima);
+    tomorrowLima.setUTCDate(tomorrowLima.getUTCDate() + 1);
+    const tm = tomorrowLima.getUTCMonth() + 1;
+    const td = tomorrowLima.getUTCDate();
+    const ty = tomorrowLima.getUTCFullYear();
+
+    const { data: personasHoy, error: pErrHoy } = await supabase
       .from("personas")
       .select("id, nombre")
       .eq("activo", true)
       .eq("cumple_mes", m)
       .eq("cumple_dia", d);
+    if (pErrHoy) throw pErrHoy;
 
-    if (pErr) throw pErr;
+    const { data: personasManana, error: pErrManana } = await supabase
+      .from("personas")
+      .select("id, nombre")
+      .eq("activo", true)
+      .eq("cumple_mes", tm)
+      .eq("cumple_dia", td);
+    if (pErrManana) throw pErrManana;
 
-    if (!personas?.length) {
+    const hasToday = !!personasHoy?.length;
+    const hasTomorrow = !!personasManana?.length;
+
+    if (!hasToday && !hasTomorrow) {
       return new Response(
-        JSON.stringify({ ok: true, message: "Sin cumpleaños hoy", count: 0 }),
+        JSON.stringify({ ok: true, message: "Sin cumpleaños hoy ni mañana", count: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const nombres = personas.map((p) => p.nombre).sort((a, b) => a.localeCompare(b, "es"));
-    const dedupe_key = `cumpleanos-${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    const titulo = nombres.length === 1 ? "Cumpleaños hoy" : `Cumpleaños hoy (${nombres.length})`;
-    const cuerpo =
-      nombres.length === 1
-        ? `Hoy cumple años: ${nombres[0]}.`
-        : `Hoy cumplen años: ${nombres.join(", ")}.`;
+    const buckets = [
+      {
+        isTomorrow: false,
+        y,
+        m,
+        d,
+        personas: personasHoy ?? [],
+      },
+      {
+        isTomorrow: true,
+        y: ty,
+        m: tm,
+        d: td,
+        personas: personasManana ?? [],
+      },
+    ].filter((b) => b.personas.length > 0);
 
-    const { error: insErr } = await supabase.from("notificaciones").insert({
-      tipo: "cumpleanos",
-      titulo,
-      cuerpo,
-      dedupe_key,
-      metadata: { personas_ids: personas.map((p) => p.id) },
-    });
-
-    if (insErr) {
-      if (insErr.code === "23505") {
-        return new Response(
-          JSON.stringify({ ok: true, message: "Ya existía notificación del día (dedupe)", dedupe_key }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      throw insErr;
-    }
-
+    const dedupeKeys: string[] = [];
+    const insertedNotifications: string[] = [];
     let emailsSent = 0;
     let emailsError = 0;
-    if (resendApiKey && resendFrom) {
-      const recipients = await getRecipientEmails(supabase);
-      for (const to of recipients) {
-        try {
-          const { data: dupRow, error: dupErr } = await supabase
-            .from("email_logs")
-            .select("id")
-            .eq("tipo", "cumpleanos")
-            .eq("dedupe_key", dedupe_key)
-            .eq("to_email", to)
-            .limit(1)
-            .maybeSingle();
-          if (dupErr) throw dupErr;
-          if (dupRow?.id) continue;
+    const recipients = resendApiKey && resendFrom ? await getRecipientEmails(supabase) : [];
 
-          const result = await sendEmailViaResend({
-            apiKey: resendApiKey,
-            from: resendFrom,
-            to,
-            subject: titulo,
-            html: birthdayEmailHtml(cuerpo),
-          });
+    for (const bucket of buckets) {
+      const nombres = bucket.personas.map((p) => p.nombre).sort((a, b) => a.localeCompare(b, "es"));
+      const dedupe_key = `cumpleanos-${bucket.isTomorrow ? "manana" : "hoy"}-${bucket.y}-${String(bucket.m).padStart(2, "0")}-${String(bucket.d).padStart(2, "0")}`;
+      dedupeKeys.push(dedupe_key);
+      const { titulo, cuerpo } = buildBirthdayCopy(nombres, bucket.isTomorrow);
 
-          const { error: logErr } = await supabase.from("email_logs").insert({
-            tipo: "cumpleanos",
-            dedupe_key,
-            to_email: to,
-            subject: titulo,
-            status: "sent",
-            provider: "resend",
-            provider_message_id: result.id ?? null,
-          });
-          if (logErr && logErr.code !== "23505") throw logErr;
-          emailsSent += 1;
-        } catch (mailErr) {
-          const message = mailErr instanceof Error ? mailErr.message : String(mailErr);
-          await supabase.from("email_logs").insert({
-            tipo: "cumpleanos",
-            dedupe_key,
-            to_email: to,
-            subject: titulo,
-            status: "error",
-            provider: "resend",
-            error: message,
-          });
-          emailsError += 1;
+      const { error: insErr } = await supabase.from("notificaciones").insert({
+        tipo: "cumpleanos",
+        titulo,
+        cuerpo,
+        dedupe_key,
+        metadata: {
+          personas_ids: bucket.personas.map((p) => p.id),
+          reminder: bucket.isTomorrow ? "day_before" : "same_day",
+          target_date_lima: `${bucket.y}-${String(bucket.m).padStart(2, "0")}-${String(bucket.d).padStart(2, "0")}`,
+        },
+      });
+
+      if (insErr) {
+        if (insErr.code === "23505") continue;
+        throw insErr;
+      }
+      insertedNotifications.push(dedupe_key);
+
+      if (resendApiKey && resendFrom) {
+        for (const to of recipients) {
+          try {
+            const { data: dupRow, error: dupErr } = await supabase
+              .from("email_logs")
+              .select("id")
+              .eq("tipo", "cumpleanos")
+              .eq("dedupe_key", dedupe_key)
+              .eq("to_email", to)
+              .limit(1)
+              .maybeSingle();
+            if (dupErr) throw dupErr;
+            if (dupRow?.id) continue;
+
+            const result = await sendEmailViaResend({
+              apiKey: resendApiKey,
+              from: resendFrom,
+              to,
+              subject: titulo,
+              html: birthdayEmailHtml(cuerpo),
+            });
+
+            const { error: logErr } = await supabase.from("email_logs").insert({
+              tipo: "cumpleanos",
+              dedupe_key,
+              to_email: to,
+              subject: titulo,
+              status: "sent",
+              provider: "resend",
+              provider_message_id: result.id ?? null,
+            });
+            if (logErr && logErr.code !== "23505") throw logErr;
+            emailsSent += 1;
+          } catch (mailErr) {
+            const message = mailErr instanceof Error ? mailErr.message : String(mailErr);
+            await supabase.from("email_logs").insert({
+              tipo: "cumpleanos",
+              dedupe_key,
+              to_email: to,
+              subject: titulo,
+              status: "error",
+              provider: "resend",
+              error: message,
+            });
+            emailsError += 1;
+          }
         }
       }
     }
@@ -188,8 +246,11 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         ok: true,
-        count: personas.length,
-        dedupe_key,
+        count: (personasHoy?.length ?? 0) + (personasManana?.length ?? 0),
+        today_count: personasHoy?.length ?? 0,
+        tomorrow_count: personasManana?.length ?? 0,
+        dedupe_keys: dedupeKeys,
+        inserted_notifications: insertedNotifications,
         email: { sent: emailsSent, error: emailsError },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
