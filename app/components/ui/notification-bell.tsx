@@ -109,7 +109,15 @@ export function NotificationBell() {
     if (res.ok) toast.success("Web Push activado. Ya puedes probar el envío desde el servidor.");
     else if (res.reason === "permission_denied") toast.error("Permiso de notificaciones denegado.");
     else if (res.reason === "no_push_manager") toast.error("Este navegador no soporta Web Push.");
-    else toast.error("No se pudo activar Web Push. Intenta de nuevo o usa otro navegador.");
+    else if (res.reason === "ios_requires_installed_pwa") {
+      toast.error(
+        "En iPhone: abre Renacer en Safari → Compartir → Añadir a pantalla de inicio → abre el icono y vuelve a activar Web Push.",
+      );
+    } else if (res.reason === "subscribe_failed") {
+      toast.error("No se pudo suscribir al push. Prueba desde Chrome en Android o instala la PWA en iPhone.");
+    } else if (res.reason === "db_error") {
+      toast.error(res.detail ? `No se guardó la suscripción: ${res.detail}` : "No se guardó la suscripción en el servidor.");
+    } else toast.error("No se pudo activar Web Push. Intenta de nuevo o usa otro navegador.");
   }, []);
 
   // Cuando la app está abierta y llega una notificación nueva sin leer,
