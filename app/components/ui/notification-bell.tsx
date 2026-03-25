@@ -16,8 +16,11 @@ import {
 import { isLikelyIOS, isStandaloneDisplayMode } from "~/lib/device";
 import { showOsNotification } from "~/lib/native-notifications";
 import { ensurePushSubscribed } from "~/lib/webPush";
+import { toast } from "sonner";
 
 const POLL_MS = 45_000;
+
+const VAPID_PUBLIC_KEY = String(import.meta.env.VITE_VAPID_PUBLIC_KEY ?? "").trim();
 
 function iconForTipo(tipo: TipoNotificacion) {
   if (tipo === "cumpleanos") return Cake;
@@ -101,10 +104,12 @@ export function NotificationBell() {
   }, []);
 
   const requestWebPush = useCallback(async () => {
-    const key = (import.meta as any)?.env?.VITE_VAPID_PUBLIC_KEY as string | undefined;
-    const vapidPublicKey = String(key ?? "").trim();
-    if (!vapidPublicKey) return;
-    await ensurePushSubscribed({ vapidPublicKey });
+    if (!VAPID_PUBLIC_KEY) return;
+    const res = await ensurePushSubscribed({ vapidPublicKey: VAPID_PUBLIC_KEY });
+    if (res.ok) toast.success("Web Push activado. Ya puedes probar el envío desde el servidor.");
+    else if (res.reason === "permission_denied") toast.error("Permiso de notificaciones denegado.");
+    else if (res.reason === "no_push_manager") toast.error("Este navegador no soporta Web Push.");
+    else toast.error("No se pudo activar Web Push. Intenta de nuevo o usa otro navegador.");
   }, []);
 
   // Cuando la app está abierta y llega una notificación nueva sin leer,
@@ -184,18 +189,18 @@ export function NotificationBell() {
             >
               Activar notificaciones nativas
             </Button>
+          </div>
+        )}
 
-            {String(((import.meta as any)?.env?.VITE_VAPID_PUBLIC_KEY ?? "")).trim() && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="w-full"
-                onClick={() => void requestWebPush()}
-              >
-                Activar Web Push (prueba)
-              </Button>
-            )}
+        {VAPID_PUBLIC_KEY && (
+          <div className="px-3 py-2 border-b border-gray-100 space-y-2">
+            <p className="text-xs text-gray-600">
+              <strong className="text-gray-800">Web Push (prueba):</strong> recibe avisos aunque cierres la app (Android
+              Chrome; en iPhone instala la app desde Safari con “Añadir a pantalla de inicio”).
+            </p>
+            <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => void requestWebPush()}>
+              Activar Web Push (prueba)
+            </Button>
           </div>
         )}
 
