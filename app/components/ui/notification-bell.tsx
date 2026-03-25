@@ -15,6 +15,7 @@ import {
 } from "~/services/notificacionesService";
 import { isLikelyIOS, isStandaloneDisplayMode } from "~/lib/device";
 import { showOsNotification } from "~/lib/native-notifications";
+import { ensurePushSubscribed } from "~/lib/webPush";
 
 const POLL_MS = 45_000;
 
@@ -99,6 +100,13 @@ export function NotificationBell() {
     }
   }, []);
 
+  const requestWebPush = useCallback(async () => {
+    const key = (import.meta as any)?.env?.VITE_VAPID_PUBLIC_KEY as string | undefined;
+    const vapidPublicKey = String(key ?? "").trim();
+    if (!vapidPublicKey) return;
+    await ensurePushSubscribed({ vapidPublicKey });
+  }, []);
+
   // Cuando la app está abierta y llega una notificación nueva sin leer,
   // mostramos una notificación nativa del sistema (sin Web Push).
   useEffect(() => {
@@ -176,6 +184,18 @@ export function NotificationBell() {
             >
               Activar notificaciones nativas
             </Button>
+
+            {String(((import.meta as any)?.env?.VITE_VAPID_PUBLIC_KEY ?? "")).trim() && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={() => void requestWebPush()}
+              >
+                Activar Web Push (prueba)
+              </Button>
+            )}
           </div>
         )}
 

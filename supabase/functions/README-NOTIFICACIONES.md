@@ -35,6 +35,13 @@ Si defines estos secrets en Supabase, además de la notificación interna se env
 - `RESEND_API_KEY`
 - `RESEND_FROM` (ej. `alertas@tu-dominio.com`)
 
+**Plantilla de cumpleaños en Resend (opcional):**
+
+- `RESEND_BIRTHDAY_TEMPLATE_ID`: ID o **alias** de la plantilla **publicada** en el dashboard de Resend. Si está definido, `notify-birthdays` envía con `template` + variables y **no** usa el HTML mínimo interno.
+- Variables que debe tener la plantilla (mismos nombres que en el editor): `TITULO`, `MENSAJE`, `FECHA_LIMA`, `APP_NAME`.
+- `FECHA_LIMA` es la fecha del cumpleaños objetivo en español (ej. `24 de marzo de 2026`), según el bucket (hoy o mañana).
+- `APP_NAME` por defecto en código es `Renacer ERP`; puedes sobreescribirlo con el secret `APP_NAME_EMAIL` si lo necesitas.
+
 Se registra deduplicación por destinatario en `email_logs` con `dedupe_key`.
 
 ## Datos
@@ -49,6 +56,38 @@ Se registra deduplicación por destinatario en `email_logs` con `dedupe_key`.
 ```bash
 curl -i "https://<PROJECT_REF>.supabase.co/functions/v1/notify-birthdays"
 curl -i "https://<PROJECT_REF>.supabase.co/functions/v1/notify-rent-alert"
+```
+
+## Web Push (PWA) - Prueba rápida
+
+1. Genera llaves VAPID (en tu PC):
+
+```bash
+npx web-push generate-vapid-keys --json
+```
+
+2. Secrets en Supabase (**Project Settings → Edge Functions → Secrets**):
+
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
+- `VAPID_SUBJECT` (ej. `mailto:admin@renacer.local`)
+
+3. En el frontend define `VITE_VAPID_PUBLIC_KEY` (Vercel env var) con el mismo valor de `VAPID_PUBLIC_KEY`.
+
+4. Despliega la función de prueba:
+
+```bash
+npx supabase functions deploy send-web-push-test
+```
+
+5. En la app, abre la campanita → botón **“Activar Web Push (prueba)”** (esto guarda la suscripción en `push_subscriptions`).
+
+6. Lanza un push de prueba:
+
+```bash
+curl -i "https://<PROJECT_REF>.supabase.co/functions/v1/send-web-push-test" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Renacer","body":"Hola desde Web Push","url":"/"}'
 ```
 
 (Sin `Authorization` si el proyecto respeta `verify_jwt = false`; en algunos entornos puede requerirse la anon key en el header — consulta la documentación actual de Supabase.)

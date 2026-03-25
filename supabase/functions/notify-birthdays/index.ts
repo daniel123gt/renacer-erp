@@ -32,25 +32,61 @@ async function getRecipientEmails(supabase: any): Promise<string[]> {
   return Array.from(new Set(emails)).sort();
 }
 
-async function sendEmailViaResend(params: {
+const MESES_ES = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+] as const;
+
+/** Fecha calendario Lima (año/mes/día ya en zona local del negocio). */
+function formatFechaLargaEs(y: number, m: number, d: number): string {
+  const mes = MESES_ES[m - 1] ?? "mes";
+  return `${d} de ${mes} de ${y}`;
+}
+
+type SendEmailParams = {
   apiKey: string;
   from: string;
   to: string;
   subject: string;
-  html: string;
-}): Promise<ResendOk> {
+} & (
+  | { html: string; template?: never; templateVariables?: never }
+  | { html?: never; template: string; templateVariables: Record<string, string> }
+);
+
+async function sendEmailViaResend(params: SendEmailParams): Promise<ResendOk> {
+  const payload: Record<string, unknown> = {
+    from: params.from,
+    to: [params.to],
+    subject: params.subject,
+  };
+  if ("template" in params && params.template) {
+    payload.template = {
+      id: params.template,
+      variables: params.templateVariables,
+    };
+  } else if ("html" in params && params.html) {
+    payload.html = params.html;
+  } else {
+    throw new Error("Resend: hace falta html o template + variables");
+  }
+
   const resp = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${params.apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      from: params.from,
-      to: [params.to],
-      subject: params.subject,
-      html: params.html,
-    }),
+    body: JSON.stringify(payload),
   });
   const json = (await resp.json().catch(() => ({}))) as any;
   if (!resp.ok) {
@@ -103,6 +139,9 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey);
     const resendApiKey = Deno.env.get("RESEND_API_KEY") ?? "";
     const resendFrom = Deno.env.get("RESEND_FROM") ?? "";
+    /** ID o alias de la plantilla publicada en Resend (opcional). Debe usar variables TITULO, MENSAJE, FECHA_LIMA, APP_NAME. */
+    const resendBirthdayTemplateId = (Deno.env.get("RESEND_BIRTHDAY_TEMPLATE_ID") ?? "").trim();
+    const appNameForEmail = (Deno.env.get("APP_NAME_EMAIL") ?? "Renacer ERP").trim();
 
     const { data: cal, error: calErr } = await supabase.rpc("lima_calendar");
     if (calErr) throw calErr;
@@ -174,6 +213,7 @@ Deno.serve(async (req) => {
       const dedupe_key = `cumpleanos-${bucket.isTomorrow ? "manana" : "hoy"}-${bucket.y}-${String(bucket.m).padStart(2, "0")}-${String(bucket.d).padStart(2, "0")}`;
       dedupeKeys.push(dedupe_key);
       const { titulo, cuerpo } = buildBirthdayCopy(nombres, bucket.isTomorrow);
+      const fechaLima = formatFechaLargaEs(bucket.y, bucket.m, bucket.d);
 
       const { error: insErr } = await supabase.from("notificaciones").insert({
         tipo: "cumpleanos",
@@ -207,13 +247,27 @@ Deno.serve(async (req) => {
             if (dupErr) throw dupErr;
             if (dupRow?.id) continue;
 
-            const result = await sendEmailViaResend({
-              apiKey: resendApiKey,
-              from: resendFrom,
-              to,
-              subject: titulo,
-              html: birthdayEmailHtml(cuerpo),
-            });
+            const result = resendBirthdayTemplateId
+              ? await sendEmailViaResend({
+                  apiKey: resendApiKey,
+                  from: resendFrom,
+                  to,
+                  subject: titulo,
+                  template: resendBirthdayTemplateId,
+                  templateVariables: {
+                    TITULO: titulo,
+                    MENSAJE: cuerpo,
+                    FECHA_LIMA: fechaLima,
+                    APP_NAME: appNameForEmail,
+                  },
+                })
+              : await sendEmailViaResend({
+                  apiKey: resendApiKey,
+                  from: resendFrom,
+                  to,
+                  subject: titulo,
+                  html: birthdayEmailHtml(cuerpo),
+                });
 
             const { error: logErr } = await supabase.from("email_logs").insert({
               tipo: "cumpleanos",
