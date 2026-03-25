@@ -2,13 +2,15 @@
 
 ## Requisitos
 
-1. Aplicar las migraciones de notificaciones en el proyecto Supabase (`supabase db push` o SQL Editor), incluyendo `011_notificaciones_y_config.sql` y `017_fn_salida_alquiler_semana_lima.sql`.
+1. Aplicar las migraciones de notificaciones en el proyecto Supabase (`supabase db push` o SQL Editor), incluyendo `011_notificaciones_y_config.sql`, `017_fn_salida_alquiler_semana_lima.sql` y `019_web_push_subscriptions.sql` si usas Web Push.
 2. Desplegar las Edge Functions:
 
 ```bash
 npx supabase functions deploy notify-birthdays
 npx supabase functions deploy notify-rent-alert
 ```
+
+Incluyen el módulo compartido `functions/_shared/webPushBroadcast.ts` (el CLI lo empaqueta al desplegar).
 
 (O desde la raíz del repo: `npm run supabase:deploy:notifications` si está definido en `package.json`.)
 
@@ -18,8 +20,8 @@ En **Project Settings → Edge Functions → Schedules** (o **Integrations → C
 
 | Función             | Expresión cron (UTC) | Efecto aproximado (Lima, UTC-5)        |
 |---------------------|----------------------|----------------------------------------|
-| `notify-birthdays`  | `0 11 * * *`         | Todos los días **06:00** hora Lima; envía aviso de cumpleaños de **hoy** y recordatorio de **mañana** |
-| `notify-rent-alert` | `0 * * * *`          | La función corre cada hora pero **solo envía** en franjas Lima: jueves **20:00**, viernes/sábado/domingo **06:00 y 20:00**, si saldo del mes &lt; cuota **y** no hay ya una **salida** en finanzas con categoría **Alquiler** en la **semana en curso** (lunes–domingo, fecha Lima). |
+| `notify-birthdays`  | `0 11 * * *`         | Todos los días **06:00** hora Lima; crea notificación (y email Resend si aplica) por cumpleaños **hoy** y **mañana**; si existen secrets **VAPID_***, también envía **Web Push** a todas las filas de `push_subscriptions`. |
+| `notify-rent-alert` | `0 * * * *`          | Igual que antes (franjas Lima, saldo &lt; cuota, sin salida alquiler en la semana); al crear la notificación, si hay **VAPID_***, también **Web Push** masivo. |
 
 > Perú no usa horario de verano; 11:00 UTC = 06:00 Lima de forma estable.
 
@@ -66,11 +68,13 @@ curl -i "https://<PROJECT_REF>.supabase.co/functions/v1/notify-rent-alert"
 npx web-push generate-vapid-keys --json
 ```
 
-2. Secrets en Supabase (**Project Settings → Edge Functions → Secrets**):
+2. Secrets en Supabase (**Project Settings → Edge Functions → Secrets**), **mismos para** `send-web-push-test`, `notify-birthdays` y `notify-rent-alert`:
 
 - `VAPID_PUBLIC_KEY`
 - `VAPID_PRIVATE_KEY`
 - `VAPID_SUBJECT` (ej. `mailto:admin@renacer.local`)
+
+Si faltan, las funciones de cumpleaños/alquiler **siguen creando la notificación en BD** (y el email si aplica); solo se omite el push (la respuesta JSON incluye `web_push.skipped`).
 
 3. En el frontend define `VITE_VAPID_PUBLIC_KEY` (Vercel env var) con el mismo valor de `VAPID_PUBLIC_KEY`.
 
@@ -78,6 +82,13 @@ npx web-push generate-vapid-keys --json
 
 ```bash
 npx supabase functions deploy send-web-push-test
+```
+
+Tras cambios en `_shared/` o en el push de cumpleaños/alquiler, vuelve a desplegar también:
+
+```bash
+npx supabase functions deploy notify-birthdays
+npx supabase functions deploy notify-rent-alert
 ```
 
 5. En la app, abre la campanita → botón **“Activar Web Push (prueba)”** (esto guarda la suscripción en `push_subscriptions`).

@@ -5,6 +5,7 @@
  * - un recordatorio el día anterior (mañana)
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { broadcastWebPush, truncatePushBody } from "../_shared/webPushBroadcast.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -206,6 +207,9 @@ Deno.serve(async (req) => {
     const insertedNotifications: string[] = [];
     let emailsSent = 0;
     let emailsError = 0;
+    let webPushSent = 0;
+    let webPushFailed = 0;
+    let webPushSkippedReason: string | null = null;
     const recipients = resendApiKey && resendFrom ? await getRecipientEmails(supabase) : [];
 
     for (const bucket of buckets) {
@@ -232,6 +236,18 @@ Deno.serve(async (req) => {
         throw insErr;
       }
       insertedNotifications.push(dedupe_key);
+
+      const wp = await broadcastWebPush(supabase, {
+        title: titulo,
+        body: truncatePushBody(cuerpo),
+        tag: dedupe_key,
+        url: "/",
+      });
+      if (wp.skipped) webPushSkippedReason = wp.reason;
+      else {
+        webPushSent += wp.sent;
+        webPushFailed += wp.failed;
+      }
 
       if (resendApiKey && resendFrom) {
         for (const to of recipients) {
@@ -306,6 +322,12 @@ Deno.serve(async (req) => {
         dedupe_keys: dedupeKeys,
         inserted_notifications: insertedNotifications,
         email: { sent: emailsSent, error: emailsError },
+        web_push:
+          insertedNotifications.length === 0
+            ? null
+            : webPushSkippedReason !== null && webPushSent === 0 && webPushFailed === 0
+              ? { skipped: true, reason: webPushSkippedReason }
+              : { skipped: false, sent: webPushSent, failed: webPushFailed },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

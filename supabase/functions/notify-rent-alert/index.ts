@@ -10,6 +10,7 @@
  * Si en la semana ISO actual (lun–dom, Lima) ya hay una salida categorizada "Alquiler", no se envía.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { broadcastWebPush, truncatePushBody } from "../_shared/webPushBroadcast.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -192,6 +193,13 @@ Deno.serve(async (req) => {
       throw insErr;
     }
 
+    const webPush = await broadcastWebPush(supabase, {
+      title: titulo,
+      body: truncatePushBody(cuerpo),
+      tag: dedupe_key,
+      url: "/",
+    });
+
     let emailsSent = 0;
     let emailsError = 0;
     if (resendApiKey && resendFrom) {
@@ -245,7 +253,17 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ ok: true, dedupe_key, saldo, cuota, faltante, email: { sent: emailsSent, error: emailsError } }),
+      JSON.stringify({
+        ok: true,
+        dedupe_key,
+        saldo,
+        cuota,
+        faltante,
+        email: { sent: emailsSent, error: emailsError },
+        web_push: webPush.skipped
+          ? { skipped: true, reason: webPush.reason }
+          : { skipped: false, sent: webPush.sent, failed: webPush.failed },
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
