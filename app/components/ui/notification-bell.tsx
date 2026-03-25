@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, Building2, Cake, Loader2 } from "lucide-react";
+import { Bell, Building2, Cake, Check, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "~/components/ui/button";
@@ -39,11 +39,41 @@ export function NotificationBell() {
   const shownNativeIdsRef = useRef<Set<string>>(new Set());
   const [iosDevice, setIosDevice] = useState(false);
   const [standalonePwa, setStandalonePwa] = useState(false);
+  const [webPushActive, setWebPushActive] = useState(false);
+  const [webPushBusy, setWebPushBusy] = useState(false);
+  const webPushBusyRef = useRef(false);
 
   useEffect(() => {
     setIosDevice(isLikelyIOS());
     setStandalonePwa(isStandaloneDisplayMode());
   }, []);
+
+  const refreshWebPushStatus = useCallback(async () => {
+    if (!VAPID_PUBLIC_KEY) {
+      setWebPushActive(false);
+      return;
+    }
+    if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setWebPushActive(false);
+      return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      setWebPushActive(!!sub);
+    } catch {
+      setWebPushActive(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!VAPID_PUBLIC_KEY) return;
+    void refreshWebPushStatus();
+  }, [refreshWebPushStatus]);
+
+  useEffect(() => {
+    if (open) void refreshWebPushStatus();
+  }, [open, refreshWebPushStatus]);
 
   const refresh = useCallback(async () => {
     try {
@@ -105,19 +135,31 @@ export function NotificationBell() {
 
   const requestWebPush = useCallback(async () => {
     if (!VAPID_PUBLIC_KEY) return;
-    const res = await ensurePushSubscribed({ vapidPublicKey: VAPID_PUBLIC_KEY });
-    if (res.ok) toast.success("Web Push activado. Ya puedes probar el envío desde el servidor.");
-    else if (res.reason === "permission_denied") toast.error("Permiso de notificaciones denegado.");
-    else if (res.reason === "no_push_manager") toast.error("Este navegador no soporta Web Push.");
-    else if (res.reason === "ios_requires_installed_pwa") {
-      toast.error(
-        "En iPhone: abre Renacer en Safari → Compartir → Añadir a pantalla de inicio → abre el icono y vuelve a activar Web Push.",
-      );
-    } else if (res.reason === "subscribe_failed") {
-      toast.error("No se pudo suscribir al push. Prueba desde Chrome en Android o instala la PWA en iPhone.");
-    } else if (res.reason === "db_error") {
-      toast.error(res.detail ? `No se guardó la suscripción: ${res.detail}` : "No se guardó la suscripción en el servidor.");
-    } else toast.error("No se pudo activar Web Push. Intenta de nuevo o usa otro navegador.");
+    if (webPushBusyRef.current) return;
+    webPushBusyRef.current = true;
+    setWebPushBusy(true);
+    try {
+      const res = await ensurePushSubscribed({ vapidPublicKey: VAPID_PUBLIC_KEY });
+      if (res.ok) {
+        setWebPushActive(true);
+        toast.success("Web Push activado. Ya puedes probar el envío desde el servidor.");
+      } else if (res.reason === "permission_denied") toast.error("Permiso de notificaciones denegado.");
+      else if (res.reason === "no_push_manager") toast.error("Este navegador no soporta Web Push.");
+      else if (res.reason === "ios_requires_installed_pwa") {
+        toast.error(
+          "En iPhone: abre Renacer en Safari → Compartir → Añadir a pantalla de inicio → abre el icono y vuelve a activar Web Push.",
+        );
+      } else if (res.reason === "subscribe_failed") {
+        toast.error("No se pudo suscribir al push. Prueba desde Chrome en Android o instala la PWA en iPhone.");
+      } else if (res.reason === "db_error") {
+        toast.error(
+          res.detail ? `No se guardó la suscripción: ${res.detail}` : "No se guardó la suscripción en el servidor.",
+        );
+      } else toast.error("No se pudo activar Web Push. Intenta de nuevo o usa otro navegador.");
+    } finally {
+      webPushBusyRef.current = false;
+      setWebPushBusy(false);
+    }
   }, []);
 
   // Cuando la app está abierta y llega una notificación nueva sin leer,
@@ -202,13 +244,40 @@ export function NotificationBell() {
 
         {VAPID_PUBLIC_KEY && (
           <div className="px-3 py-2 border-b border-gray-100 space-y-2">
-            <p className="text-xs text-gray-600">
-              <strong className="text-gray-800">Web Push (prueba):</strong> recibe avisos aunque cierres la app (Android
-              Chrome; en iPhone instala la app desde Safari con “Añadir a pantalla de inicio”).
-            </p>
-            <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => void requestWebPush()}>
-              Activar Web Push (prueba)
-            </Button>
+            {webPushActive ? (
+              <div className="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50/80 px-2.5 py-2 text-xs text-emerald-950">
+                <Check className="h-4 w-4 shrink-0 mt-0.5 text-emerald-700" aria-hidden />
+                <span>
+                  <strong className="font-semibold">Web Push activo</strong> en este dispositivo. Si cambias de
+                  navegador o borras datos del sitio, vuelve a activarlo aquí.
+                </span>
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-gray-600">
+                  <strong className="text-gray-800">Web Push (prueba):</strong> recibe avisos aunque cierres la app
+                  (Android Chrome; en iPhone instala la app desde Safari con “Añadir a pantalla de inicio”).
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-full inline-flex items-center justify-center gap-2"
+                  disabled={webPushBusy}
+                  aria-busy={webPushBusy}
+                  onClick={() => void requestWebPush()}
+                >
+                  {webPushBusy ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
+                      Activando…
+                    </>
+                  ) : (
+                    "Activar Web Push (prueba)"
+                  )}
+                </Button>
+              </>
+            )}
           </div>
         )}
 
