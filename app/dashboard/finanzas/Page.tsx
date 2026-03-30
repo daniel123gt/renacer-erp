@@ -38,6 +38,7 @@ import {
   Edit,
   Download,
   RefreshCw,
+  ArrowRightLeft,
 } from "lucide-react";
 import {
   finanzasService,
@@ -71,6 +72,12 @@ export default function FinanzasPage() {
   const [syncFecha, setSyncFecha] = useState(() => new Date().toISOString().split("T")[0]);
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncSobrescribir, setSyncSobrescribir] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moveFecha, setMoveFecha] = useState(() => new Date().toISOString().split("T")[0]);
+  const [moveMonto, setMoveMonto] = useState("");
+  const [moveDescripcion, setMoveDescripcion] = useState("");
+  const [moveNotas, setMoveNotas] = useState("");
+  const [moveLoading, setMoveLoading] = useState(false);
 
   useEffect(() => {
     const n = new Date();
@@ -182,6 +189,33 @@ export default function FinanzasPage() {
     }
   };
 
+  const handleMoverCapitalRenashop = async () => {
+    const monto = Number(moveMonto);
+    if (!Number.isFinite(monto) || monto <= 0) {
+      toast.error("Ingresa un monto válido mayor a 0");
+      return;
+    }
+    setMoveLoading(true);
+    try {
+      await finanzasService.moverCapitalRenashop({
+        fecha: moveFecha,
+        monto,
+        descripcion: moveDescripcion || undefined,
+        notas: moveNotas || undefined,
+      });
+      toast.success(`Capital movido: S/ ${formatMoney(monto)}`);
+      setMoveOpen(false);
+      setMoveMonto("");
+      setMoveDescripcion("");
+      setMoveNotas("");
+      load();
+    } catch (err: any) {
+      toast.error(err?.message || "No se pudo mover capital Renashop");
+    } finally {
+      setMoveLoading(false);
+    }
+  };
+
   const renderTransactionRow = (tx: Transaccion) => (
     <TableRow key={tx.id} className="group">
       <TableCell className="whitespace-nowrap text-sm">{tx.fecha}</TableCell>
@@ -262,6 +296,14 @@ export default function FinanzasPage() {
             onClick={() => setSyncOpen(true)}
           >
             <RefreshCw className="w-4 h-4 mr-1" /> Sincronizar Renashop
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-amber-300 text-amber-800 hover:bg-amber-50"
+            onClick={() => setMoveOpen(true)}
+          >
+            <ArrowRightLeft className="w-4 h-4 mr-1" /> Mover capital Renashop
           </Button>
           <Button
             size="sm"
@@ -551,6 +593,65 @@ export default function FinanzasPage() {
               >
                 {syncLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Sincronizar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={moveOpen} onOpenChange={setMoveOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mover capital Renashop</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Fecha</Label>
+              <Input type="date" value={moveFecha} onChange={(e) => setMoveFecha(e.target.value)} />
+            </div>
+            <div>
+              <Label>Monto (S/)</Label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                inputMode="decimal"
+                value={moveMonto}
+                onChange={(e) => setMoveMonto(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <Label>Descripción (opcional)</Label>
+              <Input
+                value={moveDescripcion}
+                onChange={(e) => setMoveDescripcion(e.target.value)}
+                placeholder="Ej. Capital usado para cubrir gastos generales"
+              />
+            </div>
+            <div>
+              <Label>Notas (opcional)</Label>
+              <Input
+                value={moveNotas}
+                onChange={(e) => setMoveNotas(e.target.value)}
+                placeholder="Detalle interno"
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              Este movimiento crea una <strong>entrada</strong> en Finanzas y descuenta el mismo monto del
+              <strong> Capital Renashop</strong>. Es distinto a sincronizar ventas.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setMoveOpen(false)} disabled={moveLoading}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleMoverCapitalRenashop}
+                disabled={moveLoading}
+                className="bg-amber-700 hover:bg-amber-800"
+              >
+                {moveLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Mover capital
               </Button>
             </div>
           </div>

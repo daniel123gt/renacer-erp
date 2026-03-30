@@ -36,8 +36,11 @@ export interface TransaccionInput {
 
 /** Categoría de entradas creada al sincronizar ventas Renashop → Finanzas */
 export const CATEGORIA_ENTRADA_RENASHOP = "Venta Renashop";
+/** Categoría para mover capital reservado de Renashop al disponible general */
+export const CATEGORIA_MOVIMIENTO_CAPITAL_RENASHOP = "Capital Renashop";
 
 const RENASHOP_SYNC_NOTAS_MARK = "renashop_sync:";
+const RENASHOP_CAPITAL_MOVE_NOTAS_MARK = "renashop_capital_move:";
 
 /**
  * Entrada del mes contada como Renashop en el desglose: categoría "Venta Renashop"
@@ -48,6 +51,14 @@ export function esEntradaRenashopEnFinanzas(t: Transaccion): boolean {
   if (t.categoria_nombre === CATEGORIA_ENTRADA_RENASHOP) return true;
   const notas = (t.notas ?? "").toLowerCase();
   return notas.includes(RENASHOP_SYNC_NOTAS_MARK);
+}
+
+/** Entrada manual para reclasificar capital Renashop hacia el saldo disponible. */
+export function esMovimientoCapitalRenashopEnFinanzas(t: Transaccion): boolean {
+  if (t.tipo !== "entrada") return false;
+  if (t.categoria_nombre === CATEGORIA_MOVIMIENTO_CAPITAL_RENASHOP) return true;
+  const notas = (t.notas ?? "").toLowerCase();
+  return notas.includes(RENASHOP_CAPITAL_MOVE_NOTAS_MARK);
 }
 
 export interface BalanceMensual {
@@ -72,6 +83,11 @@ export interface BalanceMensual {
    * de ventas Renashop de esa fecha (total − ganancia).
    */
   entradasMesRenashopCapital: number;
+  /**
+   * Monto de entradas manuales que "liberan" capital Renashop al saldo disponible.
+   * Se registran con categoría/nota de movimiento de capital.
+   */
+  entradasMesRenashopTransferido: number;
   /** Ganancia Renashop asociada a esas entradas (bruto − capital). */
   entradasMesRenashopGanancia: number;
 }
@@ -170,8 +186,14 @@ export const finanzasService = {
     let entradasMesSinRenashop = 0;
     let entradasMesRenashopBruto = 0;
     let entradasMesRenashopCapital = 0;
+    let entradasMesRenashopTransferido = 0;
 
     for (const t of entradas) {
+      if (esMovimientoCapitalRenashopEnFinanzas(t)) {
+        entradasMesRenashopTransferido += t.monto;
+        entradasMesSinRenashop += t.monto;
+        continue;
+      }
       const esRenashop = esEntradaRenashopEnFinanzas(t);
       if (!esRenashop) {
         entradasMesSinRenashop += t.monto;
@@ -198,6 +220,7 @@ export const finanzasService = {
       entradasMesSinRenashop,
       entradasMesRenashopBruto,
       entradasMesRenashopCapital,
+      entradasMesRenashopTransferido,
       entradasMesRenashopGanancia,
     };
   },
@@ -424,5 +447,61 @@ export const finanzasService = {
     };
     const transaccion = await this.crear(input);
     return { monto, transaccion };
+  },
+
+  /**
+   * Reclasifica una parte del capital Renashop como entrada disponible en Finanzas.
+   * Crea una transacción de tipo "entrada" (separada de la sincronización de ventas).
+   */
+  async moverCapitalRenashop(input: {
+    fecha: string;
+    monto: number;
+    descripcion?: string;
+    metodo_pago?: string;
+    notas?: string;
+  }): Promise<Transaccion> {
+    const monto = Number(input.monto);
+    if (!Number.isFinite(monto) || monto <= 0) {
+      throw new Error("El monto debe ser mayor a 0.");
+    }
+
+    const [yRaw, mRaw] = input.fecha.split("-").map((v) => Number(v));
+    if (!Number.isFinite(yRaw) || !Number.isFinite(mRaw)) {
+      throw new Error("Fecha inválida para mover capital Renashop.");
+    }
+
+    const balanceMes = await this.getBalanceMensual(yRaw, mRaw);
+    const capitalDisponible = Math.max(
+      0,
+      balanceMes.entradasMesRenashopCapital - balanceMes.entradasMesRenashopTransferido,
+    );
+    if (monto > capitalDisponible) {
+      throw new Error(
+        `El capital Renashop disponible es S/ ${capitalDisponible.toFixed(2)} y no alcanza para mover S/ ${monto.toFixed(2)}.`,
+      );
+    }
+
+    const { data: cat, error: catErr } = await supabase
+      .from("categorias_finanzas")
+      .select("id")
+      .eq("tipo", "entrada")
+      .eq("nombre", CATEGORIA_MOVIMIENTO_CAPITAL_RENASHOP)
+      .limit(1)
+      .maybeSingle();
+    if (catErr) throw catErr;
+
+    const descripcion = input.descripcion?.trim() || `Movimiento de capital Renashop ${input.fecha}`;
+    const marker = `${RENASHOP_CAPITAL_MOVE_NOTAS_MARK}${input.fecha}`;
+    const notas = [marker, input.notas?.trim()].filter(Boolean).join(" | ");
+
+    return this.crear({
+      fecha: input.fecha,
+      tipo: "entrada",
+      categoria_id: cat?.id ?? null,
+      descripcion,
+      monto,
+      metodo_pago: input.metodo_pago || "otro",
+      notas,
+    });
   },
 };
