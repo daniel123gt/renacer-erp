@@ -22,8 +22,8 @@ function formatMoney(n: number): string {
 }
 
 /**
- * Icono junto a inventario: ventas Renashop con pago pendiente registradas hace más de 24 h.
- * Desaparece al marcar la venta como pagada o al quedar dentro del plazo.
+ * Icono junto a inventario: ventas Renashop con pago pendiente (aparece en cuanto hay alguna).
+ * Desaparece al marcar la venta como pagada.
  */
 export function RenashopPendingVentasAlerts() {
   const [open, setOpen] = useState(false);
@@ -32,7 +32,7 @@ export function RenashopPendingVentasAlerts() {
 
   const refresh = useCallback(async () => {
     try {
-      const list = await ventasRenashopService.listPendientesCobroAtrasado(24);
+      const list = await ventasRenashopService.listPendientesCobro();
       setVentas(list);
     } catch {
       setVentas([]);
@@ -75,8 +75,8 @@ export function RenashopPendingVentasAlerts() {
           )}
           aria-label={
             hasAlerts
-              ? `Cobros pendientes: ${count} venta(s) con pago pendiente de hace más de 24 horas`
-              : "Renashop: sin ventas pendientes atrasadas"
+              ? `Cobros pendientes: ${count} venta(s) con pago pendiente`
+              : "Renashop: sin ventas con pago pendiente"
           }
         >
           <Banknote className={cn("h-10 w-10", hasAlerts && "text-orange-600")} />
@@ -91,8 +91,7 @@ export function RenashopPendingVentasAlerts() {
         <div className="border-b border-orange-100 bg-orange-50/80 px-3 py-2">
           <span className="text-sm font-semibold text-orange-950">Pagos pendientes (Renashop)</span>
           <p className="text-[11px] text-orange-900/80 mt-0.5 leading-snug">
-            Ventas con cobro pendiente registradas hace más de 24 horas. El aviso desaparece al
-            registrar el pago o si el ticket es reciente.
+            Ventas con cobro pendiente. El aviso desaparece al registrar el pago.
           </p>
         </div>
 
@@ -104,7 +103,7 @@ export function RenashopPendingVentasAlerts() {
           ) : !hasAlerts ? (
             <div className="px-3 py-8 text-center space-y-2">
               <Banknote className="h-10 w-10 mx-auto text-emerald-500/80" />
-              <p className="text-sm text-gray-600">No hay ventas pendientes fuera de las 24 horas.</p>
+              <p className="text-sm text-gray-600">No hay ventas con pago pendiente.</p>
             </div>
           ) : (
             <ul className="divide-y divide-gray-100">

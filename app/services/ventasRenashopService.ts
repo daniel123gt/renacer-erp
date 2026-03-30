@@ -115,16 +115,11 @@ export function resumenProductosVenta(v: VentaRenashop): string {
   return `${short} +${v.lineas.length - 1}`;
 }
 
-/** Ventas con cobro pendiente registradas hace más de `horasUmbral` (por defecto 24 h). */
-const MS_POR_HORA = 60 * 60 * 1000;
-
 export const ventasRenashopService = {
   /**
-   * Tickets en estado pendiente cuya fecha de registro (`created_at`) supera el umbral.
-   * Sirve para alertas de seguimiento de cobro (p. ej. icono en cabecera).
+   * Tickets con cobro pendiente (para alertas en cabecera). Sin espera: todas las pendientes.
    */
-  async listPendientesCobroAtrasado(horasUmbral: number = 24): Promise<VentaRenashop[]> {
-    const cutoff = new Date(Date.now() - horasUmbral * MS_POR_HORA).toISOString();
+  async listPendientesCobro(): Promise<VentaRenashop[]> {
     const { data, error } = await supabase
       .from(CAB)
       .select(
@@ -151,8 +146,7 @@ export const ventasRenashopService = {
       `
       )
       .eq("estado_pago", "pendiente")
-      .lt("created_at", cutoff)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(100);
     if (error) throw error;
     return (data ?? []).map(mapVenta);
