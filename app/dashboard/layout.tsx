@@ -11,6 +11,7 @@ import { Menu } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { NotificationBell } from "~/components/ui/notification-bell";
 import { InventoryStockAlerts } from "~/components/ui/inventory-stock-alerts";
+import { RenashopPendingVentasAlerts } from "~/components/ui/renashop-pending-ventas-alerts";
 import supabase from "~/utils/supabase";
 
 function MobileMenuButton() {
@@ -160,6 +161,7 @@ export default function Layout() {
               {!hideHeaderWidgets && (
                 <>
                   <InventoryStockAlerts />
+                  <RenashopPendingVentasAlerts />
                   <NotificationBell />
                 </>
               )}

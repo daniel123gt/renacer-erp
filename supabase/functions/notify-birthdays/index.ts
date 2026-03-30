@@ -115,8 +115,8 @@ function buildBirthdayCopy(nombres: string[], isTomorrow: boolean): { titulo: st
       titulo: nombres.length === 1 ? "Cumpleaños mañana" : `Cumpleaños mañana (${nombres.length})`,
       cuerpo:
         nombres.length === 1
-          ? `Mañana es el cumpleaños del hermano: ${nombres[0]}.`
-          : `Mañana es el cumpleaños de los hermanos: ${nombres.join(", ")}.`,
+          ? `Mañana cumple años un(a) hermano(a): ${nombres[0]}.`
+          : `Mañana cumplen años hermanos(as): ${nombres.join(", ")}.`,
     };
   }
 

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import {
   Table,
   TableBody,
@@ -84,6 +86,47 @@ export default function VentasPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingVenta, setEditingVenta] = useState<VentaRenashop | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "pagado" | "pendiente">("todos");
+  const [filtroFecha, setFiltroFecha] = useState("");
+  const [filtroProducto, setFiltroProducto] = useState("");
+
+  const productosUnicosMes = useMemo(() => {
+    const set = new Set<string>();
+    ventas.forEach((v) => v.lineas.forEach((l) => set.add(l.producto_nombre)));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
+  }, [ventas]);
+
+  const rangoMesFecha = useMemo(() => {
+    const m = String(month).padStart(2, "0");
+    const first = `${year}-${m}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const last = `${year}-${m}-${String(lastDay).padStart(2, "0")}`;
+    return { min: first, max: last };
+  }, [year, month]);
+
+  const ventasFiltradas = useMemo(() => {
+    return ventas.filter((v) => {
+      if (filtroEstado === "pagado" && v.estado_pago !== "pagado") return false;
+      if (filtroEstado === "pendiente" && v.estado_pago !== "pendiente") return false;
+      if (filtroFecha.trim() && v.fecha !== filtroFecha.trim()) return false;
+      if (filtroProducto.trim()) {
+        const ok = v.lineas.some((l) => l.producto_nombre === filtroProducto);
+        if (!ok) return false;
+      }
+      return true;
+    });
+  }, [ventas, filtroEstado, filtroFecha, filtroProducto]);
+
+  const totalFiltrado = ventasFiltradas.reduce((s, v) => s + totalVenta(v), 0);
+  const hayFiltrosActivos =
+    filtroEstado !== "todos" || Boolean(filtroFecha.trim()) || Boolean(filtroProducto.trim());
+
+  const limpiarFiltros = () => {
+    setFiltroEstado("todos");
+    setFiltroFecha("");
+    setFiltroProducto("");
+  };
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -472,9 +515,16 @@ export default function VentasPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5 text-amber-500" />
-                Detalle de ventas — {cantidadVentas} ticket(s)
+              <CardTitle className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2 sm:flex-wrap">
+                <span className="flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5 text-amber-500" />
+                  Detalle de ventas — {ventasFiltradas.length} ticket(s)
+                </span>
+                {hayFiltrosActivos && (
+                  <span className="text-sm font-normal text-gray-500">
+                    de {cantidadVentas} en el mes
+                  </span>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -488,12 +538,78 @@ export default function VentasPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-md border border-gray-200">
-                  <div className="flex items-center justify-end px-4 py-3 bg-amber-50 border-b border-amber-200 text-sm">
-                    <span className="text-amber-800 font-semibold">
-                      Total: S/ {formatMoney(totalMes)}
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end rounded-lg border border-gray-200 bg-gray-50/80 p-3">
+                    <div className="grid gap-1.5 min-w-[140px]">
+                      <Label className="text-xs text-gray-600">Estado de pago</Label>
+                      <Select
+                        value={filtroEstado}
+                        onValueChange={(v) => setFiltroEstado(v as "todos" | "pagado" | "pendiente")}
+                      >
+                        <SelectTrigger className="h-9 bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos</SelectItem>
+                          <SelectItem value="pagado">Pagado</SelectItem>
+                          <SelectItem value="pendiente">Pendiente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-1.5 min-w-[160px]">
+                      <Label className="text-xs text-gray-600">Fecha</Label>
+                      <Input
+                        type="date"
+                        min={rangoMesFecha.min}
+                        max={rangoMesFecha.max}
+                        value={filtroFecha}
+                        onChange={(e) => setFiltroFecha(e.target.value)}
+                        className="h-9 bg-white"
+                      />
+                    </div>
+                    <div className="grid gap-1.5 min-w-[180px] flex-1 sm:max-w-xs">
+                      <Label className="text-xs text-gray-600">Producto</Label>
+                      <Select
+                        value={filtroProducto || "__todos__"}
+                        onValueChange={(v) => setFiltroProducto(v === "__todos__" ? "" : v)}
+                      >
+                        <SelectTrigger className="h-9 bg-white">
+                          <SelectValue placeholder="Todos los productos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__todos__">Todos los productos</SelectItem>
+                          {productosUnicosMes.map((p) => (
+                            <SelectItem key={p} value={p}>
+                              {p}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {hayFiltrosActivos && (
+                      <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={limpiarFiltros}>
+                        Limpiar filtros
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="overflow-x-auto rounded-md border border-gray-200">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-amber-50 border-b border-amber-200 text-sm">
+                    <span className="text-gray-600">
+                      {hayFiltrosActivos ? "Total (filtrado)" : "Total del listado"}
+                    </span>
+                    <span className="text-amber-800 font-semibold tabular-nums">
+                      S/ {formatMoney(totalFiltrado)}
                     </span>
                   </div>
+                  {ventasFiltradas.length === 0 ? (
+                    <div className="px-4 py-10 text-center text-gray-600">
+                      <p className="font-medium">No hay ventas con estos filtros</p>
+                      <Button type="button" variant="outline" size="sm" className="mt-3" onClick={limpiarFiltros}>
+                        Limpiar filtros
+                      </Button>
+                    </div>
+                  ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -510,7 +626,7 @@ export default function VentasPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ventas.map((v) => {
+                      {ventasFiltradas.map((v) => {
                         const open = expandedIds.has(v.id);
                         return (
                           <Fragment key={v.id}>
@@ -631,6 +747,8 @@ export default function VentasPage() {
                       })}
                     </TableBody>
                   </Table>
+                  )}
+                </div>
                 </div>
               )}
             </CardContent>

@@ -307,6 +307,7 @@ export function AddVentaModal({ open, onOpenChange, onSuccess, editData }: Props
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         fullScreenOnMobile
+        onOpenAutoFocus={(e) => e.preventDefault()}
         className={cn(
           /* Nunca uses `relative` aquí: anula `fixed` del Dialog y rompe el fullscreen en móvil */
           "w-full sm:max-w-[min(96vw,720px)] sm:p-6",
