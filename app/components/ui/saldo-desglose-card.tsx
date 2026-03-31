@@ -14,7 +14,8 @@ type Props = {
  */
 export function SaldoDesgloseCard({ balance, formatMoney, variant = "default" }: Props) {
   const capitalTransferido = balance.entradasMesRenashopTransferido ?? 0;
-  const capitalRenashop = Math.max(0, balance.entradasMesRenashopCapital - capitalTransferido);
+  const comprasRenashop = balance.salidasMesRenashopCompras ?? 0;
+  const capitalRenashop = Math.max(0, balance.entradasMesRenashopCapital - capitalTransferido - comprasRenashop);
   // El "mover capital" es una reclasificación interna; evitamos doble conteo.
   const saldoActual = balance.saldo - capitalRenashop - capitalTransferido;
   const saldoTotal = balance.saldo - capitalTransferido;

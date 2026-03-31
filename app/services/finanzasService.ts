@@ -38,9 +38,12 @@ export interface TransaccionInput {
 export const CATEGORIA_ENTRADA_RENASHOP = "Venta Renashop";
 /** Categoría para mover capital reservado de Renashop al disponible general */
 export const CATEGORIA_MOVIMIENTO_CAPITAL_RENASHOP = "Capital Renashop";
+/** Categoría de salidas asociadas a compras/gastos de Renashop */
+export const CATEGORIA_SALIDA_RENASHOP = "Compra Renashop";
 
 const RENASHOP_SYNC_NOTAS_MARK = "renashop_sync:";
 const RENASHOP_CAPITAL_MOVE_NOTAS_MARK = "renashop_capital_move:";
+const RENASHOP_COMPRA_NOTAS_MARK = "renashop_compra:";
 
 /**
  * Entrada del mes contada como Renashop en el desglose: categoría "Venta Renashop"
@@ -59,6 +62,14 @@ export function esMovimientoCapitalRenashopEnFinanzas(t: Transaccion): boolean {
   if (t.categoria_nombre === CATEGORIA_MOVIMIENTO_CAPITAL_RENASHOP) return true;
   const notas = (t.notas ?? "").toLowerCase();
   return notas.includes(RENASHOP_CAPITAL_MOVE_NOTAS_MARK);
+}
+
+/** Salida que corresponde a compras/gastos de Renashop. */
+export function esSalidaRenashopEnFinanzas(t: Transaccion): boolean {
+  if (t.tipo !== "salida") return false;
+  if (t.categoria_nombre === CATEGORIA_SALIDA_RENASHOP) return true;
+  const notas = (t.notas ?? "").toLowerCase();
+  return notas.includes(RENASHOP_COMPRA_NOTAS_MARK);
 }
 
 export interface BalanceMensual {
@@ -90,6 +101,8 @@ export interface BalanceMensual {
   entradasMesRenashopTransferido: number;
   /** Ganancia Renashop asociada a esas entradas (bruto − capital). */
   entradasMesRenashopGanancia: number;
+  /** Salidas registradas como compras/gastos Renashop en el mes. */
+  salidasMesRenashopCompras: number;
 }
 
 function firstDayOfMonth(year: number, month: number): string {
@@ -187,6 +200,7 @@ export const finanzasService = {
     let entradasMesRenashopBruto = 0;
     let entradasMesRenashopCapital = 0;
     let entradasMesRenashopTransferido = 0;
+    let salidasMesRenashopCompras = 0;
 
     for (const t of entradas) {
       if (esMovimientoCapitalRenashopEnFinanzas(t)) {
@@ -202,6 +216,10 @@ export const finanzasService = {
       entradasMesRenashopBruto += t.monto;
       const gananciaDia = gananciaPorFecha[t.fecha] ?? 0;
       entradasMesRenashopCapital += Math.max(0, t.monto - gananciaDia);
+    }
+
+    for (const t of salidas) {
+      if (esSalidaRenashopEnFinanzas(t)) salidasMesRenashopCompras += t.monto;
     }
 
     const entradasMesRenashopGanancia = Math.max(
@@ -222,6 +240,7 @@ export const finanzasService = {
       entradasMesRenashopCapital,
       entradasMesRenashopTransferido,
       entradasMesRenashopGanancia,
+      salidasMesRenashopCompras,
     };
   },
 
@@ -501,6 +520,68 @@ export const finanzasService = {
       descripcion,
       monto,
       metodo_pago: input.metodo_pago || "otro",
+      notas,
+    });
+  },
+
+  async getSalidasRenashop(from: string, to: string): Promise<Transaccion[]> {
+    const allSalidas = await this.getTransaccionesPorTipo("salida", from, to);
+    return allSalidas.filter(esSalidaRenashopEnFinanzas);
+  },
+
+  async crearSalidaRenashop(input: {
+    fecha: string;
+    descripcion: string;
+    monto: number;
+    metodo_pago?: string;
+    persona?: string;
+    notas?: string;
+  }): Promise<Transaccion> {
+    const { data: cat, error: catErr } = await supabase
+      .from("categorias_finanzas")
+      .select("id")
+      .eq("tipo", "salida")
+      .eq("nombre", CATEGORIA_SALIDA_RENASHOP)
+      .limit(1)
+      .maybeSingle();
+    if (catErr) throw catErr;
+
+    const marker = `${RENASHOP_COMPRA_NOTAS_MARK}${input.fecha}`;
+    const notas = [marker, input.notas?.trim()].filter(Boolean).join(" | ");
+    return this.crear({
+      fecha: input.fecha,
+      tipo: "salida",
+      categoria_id: cat?.id ?? null,
+      descripcion: input.descripcion.trim(),
+      monto: input.monto,
+      metodo_pago: input.metodo_pago || "otro",
+      persona: input.persona,
+      notas,
+    });
+  },
+
+  async actualizarSalidaRenashop(
+    id: string,
+    input: {
+      fecha?: string;
+      descripcion?: string;
+      monto?: number;
+      metodo_pago?: string;
+      persona?: string;
+      notas?: string;
+    }
+  ): Promise<Transaccion> {
+    let fechaForMarker = input.fecha;
+    if (!fechaForMarker) {
+      const { data: current, error } = await supabase.from("transacciones").select("fecha").eq("id", id).single();
+      if (error) throw error;
+      fechaForMarker = String((current as any).fecha).slice(0, 10);
+    }
+    const marker = `${RENASHOP_COMPRA_NOTAS_MARK}${fechaForMarker}`;
+    const notas = [marker, input.notas?.trim()].filter(Boolean).join(" | ");
+    return this.actualizar(id, {
+      ...input,
+      tipo: "salida",
       notas,
     });
   },

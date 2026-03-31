@@ -240,7 +240,7 @@ export default function RenashopPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <Link to="/renashop/ventas">
           <Card className="hover:shadow-md transition-shadow cursor-pointer group">
             <CardContent className="pt-6">
@@ -255,6 +255,24 @@ export default function RenashopPage() {
                   </div>
                 </div>
                 <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-amber-500 transition-colors" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link to="/renashop/compras">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer group">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-red-100 rounded-lg">
+                    <TrendingDown className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">Compras</p>
+                    <p className="text-sm text-gray-500">Salidas que descuentan capital Renashop</p>
+                  </div>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-red-500 transition-colors" />
               </div>
             </CardContent>
           </Card>

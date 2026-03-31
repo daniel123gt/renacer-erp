@@ -11,6 +11,7 @@ export default [
     route('finanzas/salidas', 'routes/finanzas-salidas.tsx'),
     route('renashop', 'routes/renashop.tsx'),
     route('renashop/ventas', 'routes/renashop-ventas.tsx'),
+    route('renashop/compras', 'routes/renashop-compras.tsx'),
     route('renashop/inventario', 'routes/renashop-inventario.tsx'),
     route('renashop/reportes', 'routes/renashop-reportes.tsx'),
     route('personas', 'routes/personas.tsx'),
