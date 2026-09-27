@@ -1,12 +1,11 @@
 /**
- * Cron recomendado (UTC): 0 1,11 * * 0,1,5,6
- *   → 01:00 UTC = 20:00 Lima del día anterior (jue–dom noche); 11:00 UTC = 06:00 Lima (vie–dom mañana).
- *   Solo 8 ejecuciones/semana (la de lunes 06:00 Lima se descarta abajo). Evita invocar cada hora.
+ * Cron recomendado (UTC): 0 11,17,23 * * 4,5,6
+ *   → 11:00 / 17:00 / 23:00 UTC = 06:00 / 12:00 / 18:00 Lima, jueves a sábado.
+ *   Solo 9 ejecuciones/semana. Evita invocar cada hora.
  *
  * Regla horaria (Lima):
- * - Si es lunes/martes/miércoles: no se envía.
- * - Si es jueves: solo en la noche (20:00).
- * - Si es viernes/sábado/domingo: solo 2 veces al día (06:00 y 20:00).
+ * - Solo jueves, viernes y sábado.
+ * - Solo 3 veces al día: 06:00, 12:00 y 18:00.
  *
  * Cuando saldo del mes < app_config.cuota_alquiler -> crea notificación y email (con dedupe por franja).
  * Si en la semana ISO actual (lun–dom, Lima) ya hay una salida categorizada "Alquiler", no se envía.
@@ -103,16 +102,14 @@ Deno.serve(async (req) => {
     const isodow = row.isodow as number;
     const hr = row.hr as number;
 
-    const isThu = isodow === 4;
-    const isFriSatSun = isodow >= 5;
-    const slot = hr === 6 ? "manana" : hr === 20 ? "noche" : null;
-    const shouldRunWindow = (isThu && hr >= 20) || isFriSatSun;
-    if (!shouldRunWindow || !slot) {
+    const isThuFriSat = isodow >= 4 && isodow <= 6;
+    const slot = hr === 6 ? "manana" : hr === 12 ? "mediodia" : hr === 18 ? "tarde" : null;
+    if (!isThuFriSat || !slot) {
       return new Response(
         JSON.stringify({
           ok: true,
           skipped: true,
-          reason: "Fuera de franja de envío (06:00 o 20:00; desde jueves noche)",
+          reason: "Fuera de franja de envío (jueves a sábado, 06:00 / 12:00 / 18:00 Lima)",
           lima: { isodow, hr },
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
