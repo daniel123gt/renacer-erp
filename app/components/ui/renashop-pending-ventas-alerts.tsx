@@ -14,8 +14,7 @@ import {
   type VentaRenashop,
   totalVenta,
 } from "~/services/ventasRenashopService";
-
-const POLL_MS = 60_000;
+import { useVisiblePolling } from "~/hooks/use-visible-polling";
 
 function formatMoney(n: number): string {
   return n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -41,19 +40,7 @@ export function RenashopPendingVentasAlerts() {
     }
   }, []);
 
-  useEffect(() => {
-    void refresh();
-    const t = setInterval(() => void refresh(), POLL_MS);
-    return () => clearInterval(t);
-  }, [refresh]);
-
-  useEffect(() => {
-    const onVis = () => {
-      if (document.visibilityState === "visible") void refresh();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, [refresh]);
+  useVisiblePolling(refresh);
 
   useEffect(() => {
     if (open) void refresh();

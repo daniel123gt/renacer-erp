@@ -17,8 +17,7 @@ import { isLikelyIOS, isStandaloneDisplayMode } from "~/lib/device";
 import { showOsNotification } from "~/lib/native-notifications";
 import { ensurePushSubscribed } from "~/lib/webPush";
 import { toast } from "sonner";
-
-const POLL_MS = 45_000;
+import { useVisiblePolling } from "~/hooks/use-visible-polling";
 
 const VAPID_PUBLIC_KEY = String(import.meta.env.VITE_VAPID_PUBLIC_KEY ?? "").trim();
 
@@ -86,11 +85,7 @@ export function NotificationBell() {
     }
   }, []);
 
-  useEffect(() => {
-    void refresh();
-    const t = setInterval(() => void refresh(), POLL_MS);
-    return () => clearInterval(t);
-  }, [refresh]);
+  useVisiblePolling(refresh);
 
   useEffect(() => {
     if (open) void refresh();

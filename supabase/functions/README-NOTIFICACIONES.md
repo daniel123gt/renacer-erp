@@ -21,7 +21,7 @@ En **Project Settings → Edge Functions → Schedules** (o **Integrations → C
 | Función             | Expresión cron (UTC) | Efecto aproximado (Lima, UTC-5)        |
 |---------------------|----------------------|----------------------------------------|
 | `notify-birthdays`  | `0 11 * * *`         | Todos los días **06:00** hora Lima; crea notificación (y email Resend si aplica) por cumpleaños **hoy** y **mañana**; si existen secrets **VAPID_***, también envía **Web Push** a todas las filas de `push_subscriptions`. |
-| `notify-rent-alert` | `0 * * * *`          | Igual que antes (franjas Lima, saldo &lt; cuota, sin salida alquiler en la semana); al crear la notificación, si hay **VAPID_***, también **Web Push** masivo. |
+| `notify-rent-alert` | `0 1,11 * * 0,1,5,6` | Solo en las franjas de envío: jueves–domingo **20:00** Lima (01:00 UTC del día siguiente) y viernes–domingo **06:00** Lima (11:00 UTC). Saldo &lt; cuota y sin salida alquiler en la semana; al crear la notificación, si hay **VAPID_***, también **Web Push** masivo. No usar `0 * * * *`: 168 invocaciones/semana consumen Disk IO sin necesidad. |
 
 > Perú no usa horario de verano; 11:00 UTC = 06:00 Lima de forma estable.
 

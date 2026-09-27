@@ -11,11 +11,19 @@ export interface NotificacionConEstado {
   leida: boolean;
 }
 
+/**
+ * ID del usuario desde la sesión local (sin llamada al servidor de Auth).
+ * Las políticas RLS validan igualmente el JWT en cada consulta.
+ */
+async function getSessionUserId(): Promise<string | null> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session?.user?.id ?? null;
+}
+
 export const notificacionesService = {
   async listar(limite = 50): Promise<NotificacionConEstado[]> {
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
-    if (userErr) throw userErr;
-    const uid = userData.user?.id;
+    const uid = await getSessionUserId();
     if (!uid) return [];
 
     const { data: notifs, error: nErr } = await supabase
@@ -30,7 +38,11 @@ export const notificacionesService = {
     const { data: leidas, error: lErr } = await supabase
       .from("notificacion_lecturas")
       .select("notificacion_id")
-      .eq("user_id", uid);
+      .eq("user_id", uid)
+      .in(
+        "notificacion_id",
+        notifs.map((n) => n.id),
+      );
 
     if (lErr) throw lErr;
     const leidasSet = new Set((leidas ?? []).map((r) => r.notificacion_id));
@@ -51,9 +63,7 @@ export const notificacionesService = {
   },
 
   async marcarLeida(notificacionId: string): Promise<void> {
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
-    if (userErr) throw userErr;
-    const uid = userData.user?.id;
+    const uid = await getSessionUserId();
     if (!uid) return;
 
     const { error } = await supabase.from("notificacion_lecturas").insert({
@@ -64,8 +74,17 @@ export const notificacionesService = {
   },
 
   async marcarTodasLeidas(): Promise<void> {
+    const uid = await getSessionUserId();
+    if (!uid) return;
+
     const list = await this.listar(200);
     const unread = list.filter((n) => !n.leida);
-    await Promise.all(unread.map((n) => this.marcarLeida(n.id)));
+    if (unread.length === 0) return;
+
+    const { error } = await supabase.from("notificacion_lecturas").upsert(
+      unread.map((n) => ({ notificacion_id: n.id, user_id: uid })),
+      { onConflict: "notificacion_id,user_id", ignoreDuplicates: true },
+    );
+    if (error) throw error;
   },
 };

@@ -1,5 +1,7 @@
 /**
- * Cron recomendado (UTC): 0 * * * *  (cada hora en punto)
+ * Cron recomendado (UTC): 0 1,11 * * 0,1,5,6
+ *   → 01:00 UTC = 20:00 Lima del día anterior (jue–dom noche); 11:00 UTC = 06:00 Lima (vie–dom mañana).
+ *   Solo 8 ejecuciones/semana (la de lunes 06:00 Lima se descarta abajo). Evita invocar cada hora.
  *
  * Regla horaria (Lima):
  * - Si es lunes/martes/miércoles: no se envía.

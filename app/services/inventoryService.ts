@@ -164,7 +164,35 @@ export interface ListInventoryResult {
   hasPrevPage: boolean;
 }
 
+/** Producto con stock bajo o agotado (datos mínimos para la alerta de cabecera). */
+export interface StockAlertItem {
+  id: string;
+  name: string;
+  currentStock: number;
+  minStock: number;
+  status: "low_stock" | "out_of_stock";
+}
+
 export const inventoryService = {
+  /** Consulta liviana para la alerta de cabecera: solo columnas necesarias. */
+  async listStockAlerts(): Promise<StockAlertItem[]> {
+    const { data, error } = await supabase
+      .from("materials")
+      .select("id, name, stock, min_stock, estado")
+      .eq("is_active", true);
+    if (error) throw error;
+    const alerts: StockAlertItem[] = [];
+    for (const r of (data ?? []) as MaterialsRow[]) {
+      const currentStock = Number(r.stock ?? 0);
+      const minStock = Number(r.min_stock ?? 0);
+      const status = computeStatus(currentStock, minStock, r.estado);
+      if (status === "low_stock" || status === "out_of_stock") {
+        alerts.push({ id: r.id, name: r.name, currentStock, minStock, status });
+      }
+    }
+    return alerts;
+  },
+
   async list(): Promise<InventoryItem[]> {
     const { data, error } = await supabase
       .from("materials")

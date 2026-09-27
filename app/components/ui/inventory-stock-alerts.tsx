@@ -7,15 +7,10 @@ import { Button } from "~/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
-import { inventoryService, type InventoryItem } from "~/services/inventoryService";
+import { inventoryService, type StockAlertItem } from "~/services/inventoryService";
+import { useVisiblePolling } from "~/hooks/use-visible-polling";
 
-const POLL_MS = 60_000;
-
-function isStockAlert(item: InventoryItem): boolean {
-  return item.status === "low_stock" || item.status === "out_of_stock";
-}
-
-function sortAlerts(a: InventoryItem, b: InventoryItem): number {
+function sortAlerts(a: StockAlertItem, b: StockAlertItem): number {
   if (a.status === "out_of_stock" && b.status !== "out_of_stock") return -1;
   if (b.status === "out_of_stock" && a.status !== "out_of_stock") return 1;
   return a.name.localeCompare(b.name, "es");
@@ -27,13 +22,13 @@ function sortAlerts(a: InventoryItem, b: InventoryItem): number {
  */
 export function InventoryStockAlerts() {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [items, setItems] = useState<StockAlertItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
-      const list = await inventoryService.list();
-      setItems(list.filter(isStockAlert).sort(sortAlerts));
+      const list = await inventoryService.listStockAlerts();
+      setItems(list.sort(sortAlerts));
     } catch {
       setItems([]);
     } finally {
@@ -41,19 +36,7 @@ export function InventoryStockAlerts() {
     }
   }, []);
 
-  useEffect(() => {
-    void refresh();
-    const t = setInterval(() => void refresh(), POLL_MS);
-    return () => clearInterval(t);
-  }, [refresh]);
-
-  useEffect(() => {
-    const onVis = () => {
-      if (document.visibilityState === "visible") void refresh();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, [refresh]);
+  useVisiblePolling(refresh);
 
   useEffect(() => {
     if (open) void refresh();
