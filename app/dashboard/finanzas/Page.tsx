@@ -459,8 +459,14 @@ export default function FinanzasPage() {
                     </Table>
                   </div>
                 )}
-                {balance.fondoAnterior > 0 && (
-                  <div className="flex justify-between items-center mt-4 pt-3 border-t text-sm">
+                <div className="flex justify-between items-center mt-4 pt-3 border-t text-sm">
+                  <span className="font-medium text-gray-600">Subtotal</span>
+                  <span className="font-bold text-gray-700">
+                    S/ {formatMoney(balance.totalEntradas - balance.fondoAnterior)}
+                  </span>
+                </div>
+                {balance.fondoAnterior !== 0 && (
+                  <div className="flex justify-between items-center mt-2 text-sm">
                     <span className="font-medium text-gray-600">Fondo Anterior</span>
                     <span className="font-bold text-gray-700">S/ {formatMoney(balance.fondoAnterior)}</span>
                   </div>
